@@ -18,7 +18,7 @@ public class Flywheel extends SubsystemBase {
     Telemetry telemetry;
     private final DcMotorEx a, b;
     private State state = State.OFF;
-    private double integral = 0.0, prevErr = 0.0;
+    private double prevErr = 0.0;
 
     public Flywheel(final HardwareMap hMap, final String flywheelAName, final String flywheelBName, Telemetry telemetry) {
         this.telemetry = telemetry;
@@ -38,18 +38,22 @@ public class Flywheel extends SubsystemBase {
     /** OFF -> SPINNING_UP. Safe to call every loop; no effect if already spinning. */
     public void spinUp() {
         if (state == State.OFF) {
-            integral = 0.0;
             // Seed prevErr so the first derivative term doesn't spike.
             prevErr = RoboConstants.FLYWHEEL_TARGET_RPM - getRpm();
             state = State.SPINNING_UP;
         }
     }
 
-    /** any -> OFF. Power 0, integral reset. Safe to call every loop. */
+    /** any -> OFF. Power 0. Safe to call every loop. */
     public void stop() {
         state = State.OFF;
-        integral = 0.0;
         prevErr = 0.0;
+    }
+
+    /** Open-loop power to both motors, bypassing the PID. For SysId only; don't call periodic() alongside it. */
+    public void setRawPower(double pwr) {
+        a.setPower(pwr);
+        b.setPower(pwr);
     }
 
     public State getState() { return state; }
@@ -60,7 +64,7 @@ public class Flywheel extends SubsystemBase {
 
     /** Wheel RPM = motor RPM / gear ratio (gear ratio = motor revs per wheel rev). */
     public double getRpm() {
-        double tps = 0.5 * (a.getVelocity() + b.getVelocity()); // average of both motor encoders, ticks/s
+        double tps = a.getVelocity(); // only flywheelA has an encoder cable; ticks/s
         double motorRpm = (tps / RoboConstants.FLYWHEEL_TPR) * 60.0;
         return motorRpm / RoboConstants.FLYWHEEL_GEAR_RATIO;
     }
@@ -74,16 +78,15 @@ public class Flywheel extends SubsystemBase {
         double pwr;
 
         if (state == State.OFF) {
-            integral = 0.0;
             prevErr = 0.0;
             pwr = 0.0;
         } else {
-            integral += err * dt;
             double deriv = (err - prevErr) / dt;
             prevErr = err;
 
-            pwr = RoboConstants.FLYWHEEL_kP * err + RoboConstants.FLYWHEEL_kI * integral
-                    + RoboConstants.FLYWHEEL_kD * deriv + RoboConstants.FLYWHEEL_kF * target;
+            pwr = RoboConstants.FLYWHEEL_kP * err
+                    + RoboConstants.FLYWHEEL_kD * deriv
+                    + RoboConstants.FLYWHEEL_kS + RoboConstants.FLYWHEEL_kV * target;
 
             pwr = Math.max(0.0, Math.min(1.0, pwr)); // no reverse
 

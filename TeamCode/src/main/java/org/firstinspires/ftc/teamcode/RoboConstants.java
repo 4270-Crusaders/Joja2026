@@ -55,9 +55,10 @@ public final class RoboConstants {
     public static double FLYWHEEL_TARGET_RPM    = 3000.0; // wheel RPM. PLACEHOLDER
     public static double FLYWHEEL_RPM_TOLERANCE = 50.0;
     public static double FLYWHEEL_kP = 0.0005;   // PLACEHOLDER
-    public static double FLYWHEEL_kI = 0.0;
     public static double FLYWHEEL_kD = 0.0;
-    public static double FLYWHEEL_kF = 0.00017;  // ~1/6000 at 1:1; re-tune once gear ratio is known (~ratio/6000)
+    // Feedforward: power = kS + kV * targetRpm
+    public static double FLYWHEEL_kS = 0.0;      // power to overcome friction. TUNE: raise until wheel barely starts turning
+    public static double FLYWHEEL_kV = 0.00017;  // power per wheel RPM. ~1/6000 at 1:1, ~ratio/6000 once gear ratio known
 
     // ===== Match Loader =====
     // Control Hub servo port 1, goBILDA positional servo
