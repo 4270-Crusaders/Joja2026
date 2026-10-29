@@ -12,7 +12,7 @@
 ## Architecture (carried over from 24056-DECODE-Code)
 
 - Package layout under `org.firstinspires.ftc.teamcode`: `RoboConstants.java`, `subsystems/`, `opmodes/`, `utils/`.
-- **Departure (approved):** no `pedroPathing/` or `myLocalizer/` package — no Pedro Pathing, no localization.
+- `pedroPathing/` (Constants + Tuning) and `myLocalizer/` (DECODE's drive-encoder + IMU localizer) ported from the reference. Pedro is used **in autonomous only**; TeleOp drives through the Drivetrain subsystem.
 - Every subsystem extends FTCLib `SubsystemBase`, constructor `(HardwareMap hMap, String... deviceNames, Telemetry telemetry)`, logs `RobotLog.i("[Name] Initialized.")`, and does its hardware writes + its own telemetry block in `periodic()`.
 - All hardware map names and tuning values live in `RoboConstants`. Values that need tuning are `public static` (non-final) so Panels can edit them live.
 - OpModes are iterative `OpMode`; gamepad wrapped in FTCLib `GamepadEx`. OpModes call every subsystem's `periodic()` once per loop.
@@ -20,23 +20,25 @@
 
 ## Hardware Summary
 
-All hardware names and ports below were chosen by the PM as defaults — **verify on the robot and match the Driver Station configuration to these names.** Motor directions are defaults, also to verify.
+All ports below are the team's actual wiring (confirmed 2026-10-23). Names are PM defaults — **verify on the robot and match the Driver Station configuration to these names.** Motor directions are defaults, also to verify.
 
 | Device | Type | HW map name | Hub | Port |
 |---|---|---|---|---|
-| Left front drive | goBILDA 5203 435 RPM | `leftFront` | Control Hub | Motor 0 |
-| Left back drive | goBILDA 5203 435 RPM | `leftBack` | Control Hub | Motor 1 |
-| Right front drive | goBILDA 5203 435 RPM | `rightFront` | Control Hub | Motor 2 |
-| Right back drive | goBILDA 5203 435 RPM | `rightBack` | Control Hub | Motor 3 |
-| Intake | goBILDA 5203 1150 RPM | `intake` | Expansion Hub | Motor 0 |
-| Indexer | goBILDA 5203 1150 RPM | `indexer` | Expansion Hub | Motor 1 |
-| Flywheel A | goBILDA 5203 bare (6000 RPM, 28 TPR) | `flywheelA` | Expansion Hub | Motor 2 |
-| Flywheel B | goBILDA 5203 bare (6000 RPM, 28 TPR) | `flywheelB` | Expansion Hub | Motor 3 |
+| Left front drive | goBILDA 5203 435 RPM | `leftFront` | Control Hub | Motor 1 |
+| Left back drive | goBILDA 5203 435 RPM | `leftBack` | Control Hub | Motor 0 |
+| Right front drive | goBILDA 5203 435 RPM | `rightFront` | Expansion Hub | Motor 1 |
+| Right back drive | goBILDA 5203 435 RPM | `rightBack` | Expansion Hub | Motor 0 |
+| Intake | goBILDA 5203 1150 RPM | `intake` | Expansion Hub | Motor 3 |
+| Indexer | goBILDA 5203 1150 RPM | `indexer` | Control Hub | Motor 3 |
+| Flywheel left | goBILDA 5203 bare (6000 RPM, 28 TPR) | `flywheelLeft` | Control Hub | Motor 2 |
+| Flywheel right | goBILDA 5203 bare (6000 RPM, 28 TPR) | `flywheelRight` | Expansion Hub | Motor 2 |
 | Ball stopper | goBILDA positional servo | `stopper` | Control Hub | Servo 0 |
-| Match loader | goBILDA positional servo | `matchLoader` | Control Hub | Servo 1 |
+| Match loader | goBILDA positional servo | `matchLoader` | Expansion Hub | Servo 0 |
 | Battery voltage | Built-in hub voltage sensor | (first `VoltageSensor` in hardwareMap) | — | — |
 
-No IMU, no camera/Limelight, no other sensors.
+Control Hub built-in IMU (`imu`) is used by the Pedro localizer in auto. Drive motor encoders are read by the localizer in auto. No camera/Limelight, no other sensors.
+
+No odometry pods (decided): localization stays on drive encoders + IMU.
 
 ---
 
@@ -46,10 +48,10 @@ No IMU, no camera/Limelight, no other sensors.
 
 | Name | Model | Hub / Port | Direction (default) | Encoder |
 |---|---|---|---|---|
-| `leftFront` | 5203 435 RPM | CH M0 | REVERSE | not used |
-| `leftBack` | 5203 435 RPM | CH M1 | REVERSE | not used |
-| `rightFront` | 5203 435 RPM | CH M2 | FORWARD | not used |
-| `rightBack` | 5203 435 RPM | CH M3 | FORWARD | not used |
+| `leftFront` | 5203 435 RPM | CH M1 | REVERSE | not used |
+| `leftBack` | 5203 435 RPM | CH M0 | REVERSE | not used |
+| `rightFront` | 5203 435 RPM | EH M1 | FORWARD | not used |
+| `rightBack` | 5203 435 RPM | EH M0 | FORWARD | not used |
 
 - Mecanum, robot-centric, **full speed (1.0), no slow mode**.
 - `RUN_WITHOUT_ENCODER`, zero-power BRAKE.
@@ -79,7 +81,7 @@ Transitions:
 
 ## Intake
 
-**Motors:** `intake` — 5203 1150 RPM, EH M0, default direction FORWARD (verify: positive = pulls balls in). Plain power, no velocity control, no encoder use. Zero-power FLOAT.
+**Motors:** `intake` — 5203 1150 RPM, EH M3, default direction FORWARD (verify: positive = pulls balls in). Plain power, no velocity control, no encoder use. Zero-power FLOAT.
 
 **Sensors:** none.
 
@@ -101,7 +103,7 @@ Transitions: set directly by the OpMode via `setState(...)` each loop (see Coord
 
 Dumper-style: holds **4 balls**, takes in everything, shoots everything at once.
 
-**Motors:** `indexer` — 5203 1150 RPM, EH M1, default direction FORWARD (verify: positive = moves balls toward the shooter). Plain power, no velocity control. Zero-power BRAKE (so balls don't drift into the stopper).
+**Motors:** `indexer` — 5203 1150 RPM, CH M3, default direction FORWARD (verify: positive = moves balls toward the shooter). Plain power, no velocity control. Zero-power BRAKE (so balls don't drift into the stopper).
 
 **Sensors:** none (no ball counting).
 
@@ -143,10 +145,10 @@ Transitions: set by the OpMode each loop (see Coordination).
 ## Flywheel
 
 **Motors:** 2× goBILDA 5203 bare motor (6000 RPM, 28 ticks/rev at motor), driving one flywheel together:
-- `flywheelA`: EH M2, default direction FORWARD.
-- `flywheelB`: EH M3, default direction REVERSE. This assumes the two motors face each other on one shaft; verify that both push the wheel the same way.
+- `flywheelLeft`: CH M2, default direction FORWARD.
+- `flywheelRight`: EH M2, default direction REVERSE. This assumes the two motors face each other on one shaft; verify that both push the wheel the same way.
 
-Both motors get the same PIDF power. RPM is the average of the two built-in encoders. `RUN_WITHOUT_ENCODER` (we run our own loop), zero-power FLOAT.
+Each motor runs its **own** PIDF loop to the same target RPM, using its own encoder, so a side with more friction gets more power. `AT_SPEED` requires **both** sides within tolerance. (Changed 2026-10-23 after the two sides measured very different speeds on the same power.) `RUN_WITHOUT_ENCODER` (we run our own loop), zero-power FLOAT.
 
 - Gear ratio unknown → `FLYWHEEL_GEAR_RATIO = 1.0` placeholder, defined as motor revs per wheel rev (wheel RPM = motor RPM ÷ ratio).
 - Target RPM unknown → `FLYWHEEL_TARGET_RPM` placeholder 3000 (wheel RPM), tune.
@@ -177,7 +179,7 @@ Transitions:
 
 Lifts the plate so the robot can collect balls out of a FLOWER.
 
-**Servos:** `matchLoader` — goBILDA positional, CH S1.
+**Servos:** `matchLoader` — goBILDA positional, EH S0.
 
 **Sensors:** none.
 
@@ -205,7 +207,7 @@ Evaluated every loop, highest priority first:
    - Until the flywheel first reports `AT_SPEED`: Stopper `CLOSED`, Indexer `OFF`, Intake `OFF`.
    - Once `AT_SPEED`: Stopper `OPEN`, Indexer `FEEDING`, Intake `INTAKING`. **Latched** for the rest of this hold — a momentary RPM dip as balls go through doesn't re-close the stopper (dumper empties in one go).
    - Release → Stopper `CLOSED`, latch cleared.
-3. **Intake held OR Match Loader is `UP`** → Intake `INTAKING`, Indexer `INTAKING`, Stopper `CLOSED`.
+3. **Intake held** → Intake `INTAKING`, Indexer `INTAKING`, Stopper `CLOSED`. (The match loader is a plain toggle and does not start the intake.)
 4. **Flywheel:** `spinUp()` while Spin held or Shoot held; otherwise `stop()`.
 5. Otherwise → Intake `OFF`, Indexer `OFF`, Stopper `CLOSED`.
 
@@ -222,29 +224,24 @@ Integration decisions:
 - One driver (gamepad1 only). Wires all six subsystems; bindings per `control-mapping.md`; Coordination rules above.
 - Telemetry: each subsystem's block + loop time.
 
-### Autonomous — time + voltage based (30 s)
+### Autonomous (timed, no Pedro)
 
-Both autos share a small timed-step sequencer (list of steps, each runs until done, then the next starts). Step types: `drive(fwd, strafe, turn, seconds)`, `spinUp()`, `shoot(seconds)` (waits for `AT_SPEED`, then opens stopper + feeds), `wait(seconds)`, `matchLoader(UP/DOWN)`.
+1. **`JoJaAutoShootAndBack`** (`@Autonomous(name = "JoJa Auto Shoot and Back")`). Steps, all at 0.5 power and tuned on the robot 2026-10-24:
+   1. Strafe left 2.15 s.
+   2. Drive forward 1 s.
+   3. Flywheel on at **3400 RPM** (this auto only), then wait 2 s.
+   4. Open the stopper and feed for 3 s. Then flywheel off and stopper closed.
+   5. Drive forward 0.5 s.
+   6. Strafe right 1.5 s.
+   7. Drive backward 3.5 s.
+   8. Strafe right 1 s.
 
-**Alliance select during init:** gamepad1 X = Blue, B = Red (shown on telemetry; default Blue). Red mirrors every strafe and turn sign.
+   About 14.7 s in total.
+2. **`JoJaAutoForward1s`** (`@Autonomous(name = "JoJa Auto Forward 1s")`): drives forward 1 s at 0.5 power, then stops.
 
-All durations/powers are **placeholders to tune on the field**, kept as constants at the top of each OpMode (Panels-tunable).
+Both use the Drivetrain subsystem's voltage-compensated `timedMove`. Times and powers are constants at the top of each file.
 
-Sequencer: `opmodes/JoJaAutoBase.java`. Its `shoot` step runs the intake as well as the indexer, matching TeleOp. If the flywheel hasn't reached speed within `SHOOT_SPINUP_TIMEOUT_S` (2.5 s), it shoots anyway, so a bad RPM target can't stall auto.
-
-1. **`JoJaAutoNear`** (`@Autonomous(name = "JoJa Auto Near HIVE")`) — starts near the HIVE with 4 preloads.
-   1. Spin up flywheel.
-   2. Drive backward 0.5 power for 0.8 s (into shooting range).
-   3. Shoot for 2.0 s (dump all 4).
-   4. Stop flywheel.
-   5. Strafe out 0.5 power for 1.2 s (park/leave start).
-2. **`JoJaAutoFar`** (`@Autonomous(name = "JoJa Auto Far")`) — starts at the far position with 4 preloads.
-   1. Spin up flywheel.
-   2. Drive forward 0.6 power for 1.8 s (toward the HIVE).
-   3. Turn 0.4 power for 0.5 s (face the HIVE).
-   4. Shoot for 2.0 s.
-   5. Stop flywheel.
-   6. Drive forward 0.5 power for 0.8 s (park).
+The Pedro-based autos (Near, Far, Forward + Right test, and `JoJaAutoBase`) were removed on 2026-10-24. Pedro (`pedroPathing/`, `myLocalizer/`, Tuning) is still in the project for later.
 
 ---
 
@@ -255,6 +252,8 @@ Sequencer: `opmodes/JoJaAutoBase.java`. Its `shoot` step runs the intake as well
 | FTC SDK (official base) | 12.0.0 | — |
 | FTCLib core (`org.ftclib.ftclib:core`) | 2.1.1 | `SubsystemBase`, `GamepadEx` |
 | Panels (`com.bylazar:fullpanels`, repo `https://mymaven.bylazar.com/releases`) | 1.0.9 | Live tuning / telemetry |
+| Pedro Pathing (`com.pedropathing:ftc`) | 2.0.4 | Auto path following (same version as DECODE; the ported localizer and Tuning code targets it. 2.1.2 exists but is untested here) |
+| Pedro telemetry (`com.pedropathing:telemetry`) | 1.0.0 | Tuning OpModes |
 
-- **Dropped from the reference:** Pedro Pathing, Pedro telemetry, FTCLib vision.
-- **Risk to verify on first build:** FTCLib 2.1.1 and Panels 1.0.9 were used with SDK 11.0 in DECODE; SDK 12.0 compatibility hasn't been confirmed yet.
+- **Dropped from the reference:** FTCLib vision.
+- **Risk to verify on first build:** FTCLib 2.1.1, Panels 1.0.9 and Pedro 2.0.4 were used with SDK 11.0 in DECODE; SDK 12.0 compatibility hasn't been confirmed yet.

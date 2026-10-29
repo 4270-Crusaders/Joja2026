@@ -3,6 +3,7 @@ package org.firstinspires.ftc.teamcode.subsystems;
 import com.arcrobotics.ftclib.command.SubsystemBase;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.qualcomm.robotcore.hardware.VoltageSensor;
 import com.qualcomm.robotcore.util.RobotLog;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
@@ -23,8 +24,8 @@ public class Indexer extends SubsystemBase {
 
     Telemetry telemetry;
     private final DcMotorEx motor;
+    private final VoltageSensor voltageSensor;
     private State state = State.OFF;
-    private double power = 0.0;
 
     public Indexer(final HardwareMap hMap, final String motorName, Telemetry telemetry) {
         this.telemetry = telemetry;
@@ -33,11 +34,20 @@ public class Indexer extends SubsystemBase {
         motor.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.BRAKE); // keep balls from drifting into the stopper
         motor.setMode(DcMotorEx.RunMode.RUN_WITHOUT_ENCODER);
         motor.setPower(0.0);
+        java.util.Iterator<VoltageSensor> it = hMap.voltageSensor.iterator();
+        voltageSensor = it.hasNext() ? it.next() : null;
         RobotLog.i("[Indexer] Initialized.");
     }
 
     public void setState(State state) { this.state = state; }
     public State getState() { return state; }
+
+//    /** Power that puts about INDEXER_FEED_VOLTS on the motor at the current battery voltage. */
+//    private double feedPower() {
+//        double battery = (voltageSensor != null) ? voltageSensor.getVoltage() : 12.0;
+//        if (battery < 1.0) battery = 12.0;
+//        return Math.max(0.0, Math.min(1.0, RoboConstants.INDEXER_FEED_VOLTS / battery));
+//    }
 
     private double powerFor(State s) {
         switch (s) {
@@ -52,7 +62,7 @@ public class Indexer extends SubsystemBase {
     @Override
     public void periodic() {
         // Read constants every loop so Panels edits take effect live.
-        power = powerFor(state);
+        double power = powerFor(state);
         motor.setPower(power);
 
         telemetry.addLine("====== Indexer ======");

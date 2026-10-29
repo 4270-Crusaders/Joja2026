@@ -14,7 +14,6 @@ import java.util.Iterator;
 
 /**
  * Robot-centric mecanum drivetrain, full speed, no slow mode.
- *
  * States:
  *  IDLE       - all powers 0 (initial state)
  *  MANUAL     - TeleOp stick mix via drive(fwd, strafe, turn)
@@ -39,8 +38,6 @@ public class Drivetrain extends SubsystemBase {
     private double voltageScale = 1.0;
     private double sampledVoltage = 0.0;
 
-    // Last written wheel powers (for telemetry)
-    private double lfPwr = 0.0, lbPwr = 0.0, rfPwr = 0.0, rbPwr = 0.0;
 
     public Drivetrain(final HardwareMap hMap,
                       final String leftFrontName,
@@ -149,10 +146,10 @@ public class Drivetrain extends SubsystemBase {
         // Normalize so no wheel exceeds 1.0 (keeps the direction of motion)
         double max = Math.max(1.0, Math.max(Math.max(Math.abs(lf), Math.abs(lb)),
                 Math.max(Math.abs(rf), Math.abs(rb))));
-        lfPwr = lf / max;
-        lbPwr = lb / max;
-        rfPwr = rf / max;
-        rbPwr = rb / max;
+        double lfPwr = lf / max;
+        double lbPwr = lb / max;
+        double rfPwr = rf / max;
+        double rbPwr = rb / max;
 
         leftFront.setPower(lfPwr);
         leftBack.setPower(lbPwr);

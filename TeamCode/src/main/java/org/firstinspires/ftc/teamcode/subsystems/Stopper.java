@@ -27,6 +27,7 @@ public class Stopper extends SubsystemBase {
     public Stopper(final HardwareMap hMap, final String servoName, Telemetry telemetry) {
         this.telemetry = telemetry;
         stopper = hMap.get(Servo.class, servoName);
+        stopper.setDirection(RoboConstants.STOPPER_DIRECTION);
         // Hold the preloads from init: command CLOSED right away (same as the reference Indexer).
         stopper.setPosition(RoboConstants.STOPPER_CLOSED_POS);
         RobotLog.i("[Stopper] Initialized.");

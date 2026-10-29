@@ -10,7 +10,7 @@ import org.firstinspires.ftc.teamcode.subsystems.Flywheel;
 
 private Flywheel flywheel;
 
-flywheel = new Flywheel(hardwareMap, RoboConstants.FLYWHEEL_A_MOTOR_NAME, RoboConstants.FLYWHEEL_B_MOTOR_NAME, telemetry);
+flywheel = new Flywheel(hardwareMap, RoboConstants.FLYWHEEL_LEFT_MOTOR_NAME, RoboConstants.FLYWHEEL_RIGHT_MOTOR_NAME, telemetry);
 ```
 
 Call `flywheel.periodic();` once per `loop()` (after coordination logic has called `spinUp()`/`stop()` for this loop). Initial state is `OFF`; no other init call needed. Call `flywheel.stop(); flywheel.periodic();` in `stop()` if the OpMode overrides it (optional, the SDK zeroes motors anyway).
@@ -21,10 +21,10 @@ Add a `// ====== Flywheel ======` block. Requires `import com.qualcomm.robotcore
 
 | Type | Name | Default | Tunable (Panels) | Notes |
 |---|---|---|---|---|
-| `public static final String` | `FLYWHEEL_A_MOTOR_NAME` | `"flywheelA"` | no | EH M2, verify against DS config |
-| `public static final String` | `FLYWHEEL_B_MOTOR_NAME` | `"flywheelB"` | no | EH M3, verify against DS config |
-| `public static final DcMotorSimple.Direction` | `FLYWHEEL_A_DIRECTION` | `DcMotorSimple.Direction.FORWARD` | no | Applied once in the constructor. Verify: positive power = shooting direction |
-| `public static final DcMotorSimple.Direction` | `FLYWHEEL_B_DIRECTION` | `DcMotorSimple.Direction.REVERSE` | no | Opposite of A (motors facing each other on one shaft). Verify |
+| `public static final String` | `FLYWHEEL_LEFT_MOTOR_NAME` | `"flywheelLeft"` | no | CH M2, verify against DS config |
+| `public static final String` | `FLYWHEEL_RIGHT_MOTOR_NAME` | `"flywheelRight"` | no | EH M2, verify against DS config |
+| `public static final DcMotorSimple.Direction` | `FLYWHEEL_LEFT_DIRECTION` | `DcMotorSimple.Direction.FORWARD` | no | Applied once in the constructor. Verify: positive power = shooting direction |
+| `public static final DcMotorSimple.Direction` | `FLYWHEEL_RIGHT_DIRECTION` | `DcMotorSimple.Direction.REVERSE` | no | Opposite of A (motors facing each other on one shaft). Verify |
 | `public static final int` | `FLYWHEEL_TPR` | `28` | no | Ticks/rev at the motor (5203 bare) |
 | `public static double` | `FLYWHEEL_GEAR_RATIO` | `1.0` | yes | **Placeholder.** Motor revs per wheel rev; wheel RPM = motor RPM / ratio. Must be > 0 |
 | `public static double` | `FLYWHEEL_TARGET_RPM` | `3000.0` | yes | **Placeholder.** Wheel RPM; read every loop so live edits apply |
@@ -75,4 +75,4 @@ Flywheel consumes nothing from other subsystems. It provides:
 - Gear ratio, target RPM and all four gains are placeholders; tune on the robot.
 - No integral anti-windup (backlog doesn't specify one). Harmless at the default `kI = 0`; if kI is used, the integral only resets on `stop()`.
 - `AT_SPEED` can be reported on a single loop's RPM sample; there is no settle-time debounce (not in backlog). The shoot latch means one noisy in-tolerance sample opens the stopper. Add a debounce later if that's a problem.
-- `FLYWHEEL_A_DIRECTION` / `FLYWHEEL_B_DIRECTION` are final because it's applied only in the constructor; live Panels edits would not take effect anyway.
+- `FLYWHEEL_LEFT_DIRECTION` / `FLYWHEEL_RIGHT_DIRECTION` are final because it's applied only in the constructor; live Panels edits would not take effect anyway.

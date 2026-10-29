@@ -23,7 +23,6 @@ public class Intake extends SubsystemBase {
     Telemetry telemetry;
     private final DcMotorEx motor;
     private State state = State.OFF;
-    private double power = 0.0;
 
     public Intake(final HardwareMap hMap, final String motorName, Telemetry telemetry) {
         this.telemetry = telemetry;
@@ -41,6 +40,7 @@ public class Intake extends SubsystemBase {
     @Override
     public void periodic() {
         // Power is looked up every loop so Panels edits to RoboConstants take effect live.
+        double power;
         switch (state) {
             case INTAKING:
                 power = RoboConstants.INTAKE_POWER;
