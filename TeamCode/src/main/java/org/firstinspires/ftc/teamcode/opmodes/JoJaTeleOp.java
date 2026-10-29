@@ -44,7 +44,7 @@ public class JoJaTeleOp extends OpMode {
         intake = new Intake(hardwareMap, RoboConstants.INTAKE_MOTOR_NAME, telemetry);
         indexer = new Indexer(hardwareMap, RoboConstants.INDEXER_MOTOR_NAME, telemetry);
         stopper = new Stopper(hardwareMap, RoboConstants.STOPPER_SERVO_NAME, telemetry);
-        flywheel = new Flywheel(hardwareMap, RoboConstants.FLYWHEEL_A_MOTOR_NAME, RoboConstants.FLYWHEEL_B_MOTOR_NAME, telemetry);
+        flywheel = new Flywheel(hardwareMap, RoboConstants.FLYWHEEL_LEFT_MOTOR_NAME, RoboConstants.FLYWHEEL_RIGHT_MOTOR_NAME, telemetry);
         matchLoader = new MatchLoader(hardwareMap, RoboConstants.MATCH_LOADER_SERVO_NAME, telemetry);
 
         // util

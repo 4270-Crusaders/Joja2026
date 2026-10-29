@@ -19,7 +19,7 @@ import java.util.regex.Pattern
 
 android {
 
-    compileSdkVersion 30
+    compileSdkVersion 34 // androidx deps (via Panels) need >= 34; targetSdk stays 28 per FTC
 
     signingConfigs {
         release {
