@@ -29,7 +29,8 @@ public class Flywheel extends SubsystemBase {
         final DcMotorEx motor;
         final boolean isLeft;
         double integral = 0.0, prevErr = 0.0, rpm = 0.0, pwr = 0.0, iPwr = 0.0;
-        boolean boosting = false; // full power until close to target
+        boolean boosting = false;   // full power until close to target
+        boolean recovering = false; // full power after a shot slowed it
 
         Side(DcMotorEx motor, boolean isLeft) { this.motor = motor; this.isLeft = isLeft; }
 
@@ -98,7 +99,24 @@ public class Flywheel extends SubsystemBase {
 
     public boolean isAtSpeed() { return state == State.AT_SPEED; }
 
+    private boolean shooting = false, wasShooting = false;
+    private boolean feedOk = false; // see readyToFeed()
+    private double minShotL = 0.0, minShotR = 0.0;
+
+    private static String mode(Side s) {
+        return s.boosting ? "FULL (spin-up)" : s.recovering ? "FULL (shot)" : "pid";
+    }
+
+    /** true while balls are being fed (stopper open): any speed drop gets full power until it's back. */
+    public void setShooting(boolean shooting) { this.shooting = shooting; }
+
     public double getTargetRpm() { return RoboConstants.FLYWHEEL_TARGET_RPM; }
+
+    /**
+     * Feed gate: false while either side is more than FEED_PAUSE below target (a ball just slowed it),
+     * true again once both are within FEED_RESUME. Pause the indexer while this is false.
+     */
+    public boolean readyToFeed() { return feedOk; }
 
     /** Average wheel RPM of both sides. */
     public double getRpm() { return 0.5 * (left.rpm + right.rpm); }
@@ -118,6 +136,15 @@ public class Flywheel extends SubsystemBase {
             s.pwr = 1.0;
             return;
         }
+        // ===== Shot recovery: while shooting, a POLLEN hitting the wheel slows it. Full power the moment a side
+        // is more than RECOVERY_BAND below target, PIDF again once it's back. Keeps both sides from sagging. =====
+        if (shooting && err > RoboConstants.FLYWHEEL_RECOVERY_BAND_RPM) {
+            s.prevErr = err;
+            s.pwr = 1.0;
+            s.recovering = true;
+            return;
+        }
+        s.recovering = false;
 
         // Only build up integral near the target so spin-up from 0 doesn't wind it up and overshoot.
         // This is what lets the higher-friction side close the last gap to the target.
@@ -146,7 +173,7 @@ public class Flywheel extends SubsystemBase {
 
     @Override
     public void periodic() {
-        double target = RoboConstants.FLYWHEEL_TARGET_RPM;
+        double target = getTargetRpm();
         left.rpm = left.readRpm();
         right.rpm = right.readRpm();
 
@@ -158,23 +185,34 @@ public class Flywheel extends SubsystemBase {
             if (v > 6.0) batteryVolts = 0.8 * batteryVolts + 0.2 * v; // smooth out spikes
         }
 
+        // Feed gate, with a gap between pause and resume so it doesn't flicker on/off
+        double worstErr = target - Math.min(left.rpm, right.rpm);
+        if (state == State.OFF || worstErr > RoboConstants.FLYWHEEL_FEED_PAUSE_RPM) feedOk = false;
+        else if (worstErr < RoboConstants.FLYWHEEL_FEED_RESUME_RPM) feedOk = true;
+
         if (state == State.OFF) {
             left.pwr = 0.0;
             right.pwr = 0.0;
         } else {
             runSide(left, target);
             runSide(right, target);
+            // Lowest speed during each volley, so you can see if anything still drops toward 3000
+            if (shooting && !wasShooting) { minShotL = left.rpm; minShotR = right.rpm; }
+            if (shooting) { minShotL = Math.min(minShotL, left.rpm); minShotR = Math.min(minShotR, right.rpm); }
             boolean bothAtSpeed = Math.abs(target - left.rpm) <= RoboConstants.FLYWHEEL_RPM_TOLERANCE
                     && Math.abs(target - right.rpm) <= RoboConstants.FLYWHEEL_RPM_TOLERANCE;
             state = bothAtSpeed ? State.AT_SPEED : State.SPINNING_UP;
         }
 
+        wasShooting = shooting && state != State.OFF;
         left.motor.setPower(left.pwr);
         right.motor.setPower(right.pwr);
 
         telemetry.addLine("====== Flywheel ======");
         telemetry.addData("Flywheel/State", state);
-        telemetry.addData("Flywheel/Boost L / R", "%s / %s", left.boosting ? "FULL" : "pid", right.boosting ? "FULL" : "pid");
+        telemetry.addData("Flywheel/Boost L / R", "%s / %s", mode(left), mode(right));
+        telemetry.addData("Flywheel/Feed", feedOk ? "GO" : "WAIT (speed recovering)");
+        telemetry.addData("Flywheel/Lowest RPM L / R (while shooting)", "%.0f / %.0f", minShotL, minShotR);
         telemetry.addData("Flywheel/TargetRPM", "%.0f", target);
         // One number per line so Panels can graph each side
         telemetry.addData("Flywheel/RPM L", "%.0f", left.rpm);

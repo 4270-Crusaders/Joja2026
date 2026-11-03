@@ -4,6 +4,7 @@ import com.bylazar.telemetry.PanelsTelemetry;
 import com.bylazar.telemetry.TelemetryManager;
 import com.arcrobotics.ftclib.gamepad.GamepadEx;
 import com.arcrobotics.ftclib.gamepad.GamepadKeys;
+import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.util.ElapsedTime;
@@ -38,6 +39,7 @@ public class JoJaTeleOp extends OpMode {
     private static final double FLYWHEEL_RUN_ON_SECONDS = 0.5; // flywheel keeps spinning this long after RT is released
     private final ElapsedTime sinceSpinReleased = new ElapsedTime();
     private boolean spunSinceStart = false;
+    private java.util.List<LynxModule> hubs;
 
 
     @Override
@@ -45,6 +47,10 @@ public class JoJaTeleOp extends OpMode {
         // Panels: subsystems write to `tele`; panels.update(telemetry) sends it to Panels AND the Driver Hub
         panels = PanelsTelemetry.INSTANCE.getTelemetry();
         tele = PanelsTelemetry.INSTANCE.getFtcTelemetry();
+        // Bulk reads: all motor encoders/velocities in one read per hub per loop. Much faster loop, so the
+        // flywheel reacts sooner when a POLLEN slows it. Cache is cleared at the start of every loop.
+        hubs = hardwareMap.getAll(LynxModule.class);
+        for (LynxModule hub : hubs) hub.setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL);
         drivetrain = new Drivetrain(hardwareMap,
                 RoboConstants.DRIVE_LEFT_FRONT_NAME,
                 RoboConstants.DRIVE_LEFT_BACK_NAME,
@@ -66,6 +72,7 @@ public class JoJaTeleOp extends OpMode {
 
     @Override
     public void loop() {
+        for (LynxModule hub : hubs) hub.clearBulkCache(); // fresh sensor readings this loop
         driverOp.readButtons();
 
         /*
@@ -110,6 +117,12 @@ public class JoJaTeleOp extends OpMode {
         if (intakeHeld && !intakeWasHeld && !flywheelOn) stopper.close();
         intakeWasHeld = intakeHeld;
 
+        // Shooting = stopper open: the flywheel fights speed drops from POLLEN hitting the wheels at full power
+        flywheel.setShooting(stopper.isOpen());
+        // Feed gate: while a side is still recovering from the last ball, the indexer pauses so the next ball
+        // doesn't hit an already-slow wheel (that's what took it down to ~2800)
+        Indexer.State shootFeed = flywheel.readyToFeed() ? Indexer.State.FEEDING : Indexer.State.OFF;
+
         // ===== Intake / indexer: only the left trigger runs them (Reverse > Intake > idle) =====
         if (reverseHeld) {
             intake.setState(Intake.State.REVERSING);
@@ -117,11 +130,11 @@ public class JoJaTeleOp extends OpMode {
         } else if (intakeHeld) {
             // Left trigger: intake + indexer. Flywheel on + stopper open = shooting feed speed, otherwise intake speed.
             intake.setState(Intake.State.INTAKING);
-            indexer.setState(flywheelOn && stopper.isOpen() ? Indexer.State.FEEDING : Indexer.State.INTAKING);
+            indexer.setState(flywheelOn && stopper.isOpen() ? shootFeed : Indexer.State.INTAKING);
         } else if (flywheelOn) {
             // Flywheel on: indexer runs too (feed speed if stopper open, else holds balls at the stopper). Intake stays off.
             intake.setState(Intake.State.OFF);
-            indexer.setState(stopper.isOpen() ? Indexer.State.FEEDING : Indexer.State.INTAKING);
+            indexer.setState(stopper.isOpen() ? shootFeed : Indexer.State.INTAKING);
         } else {
             intake.setState(Intake.State.OFF);
             indexer.setState(Indexer.State.OFF);
@@ -141,7 +154,18 @@ public class JoJaTeleOp extends OpMode {
         tele.addData("Match loader (L1 up/down, Y mid/up, A mid/down)", matchLoader.getState());
         tele.addData("Loop", "%.1f ms", loopTimer.milliseconds());
         loopTimer.reset();
+        graph();
         panels.update(telemetry);
+    }
+
+    /**
+     * Panels graph: plain number values, so the Graph tab can plot them.
+     * In Panels open Graph and pick "Graph/Target RPM", "Graph/Left RPM", "Graph/Right RPM".
+     */
+    private void graph() {
+        panels.addData("Graph/Target RPM", Math.round(flywheel.getTargetRpm()));
+        panels.addData("Graph/Left RPM", Math.round(flywheel.getLeftRpm()));
+        panels.addData("Graph/Right RPM", Math.round(flywheel.getRightRpm()));
     }
 
     @Override

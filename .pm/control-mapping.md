@@ -21,6 +21,8 @@ Shooting is **manual**: the driver spins up and opens the stopper whenever they 
 
 **To shoot:** hold right trigger (flywheel + indexer) → press right bumper to open the stopper → balls feed (hold left trigger too to run the intake roller) → press right bumper again to close. Flywheel keeps spinning 0.5 s after you let go of RT.
 
+**While the stopper is open:** a side more than 30 RPM below target gets full power (shot recovery), and the indexer pauses while either side is more than 100 RPM below target, then feeds again once both are back within 40 RPM (feed gate). So each ball hits a wheel that is back at full speed.
+
 Unused: D-pad, stick buttons, back, start. (Match loader zero offset is set in JoJa Hardware Test, not here.)
 
 ### Init only (Autonomous OpModes)

@@ -70,6 +70,15 @@ public final class RoboConstants {
     // too-little-power cycle that swung 2300-3100 RPM, so after spin-up the PIDF alone holds the speed.
     // Overshoots past target? Raise BOOST_BAND. Still slow near the end? Lower it.
     public static double FLYWHEEL_BOOST_BAND_RPM = 200.0;
+    // Shot recovery (only while the stopper is open): full power whenever a side is more than this below target.
+    // Small = fights every dip right away. If it overshoots above target while shooting, raise it a little.
+    public static double FLYWHEEL_RECOVERY_BAND_RPM = 30.0;
+    // Feed gate (2026-11-03): a POLLEN hitting both wheels took them to ~2800, and the next ball came in before they
+    // recovered. Now the indexer PAUSES while either side is more than FEED_PAUSE below target, and feeds again once
+    // both are back within FEED_RESUME. Each ball leaves at ~target speed, and the dips can't stack up.
+    // Shooting too slow (long pauses)? Raise FEED_PAUSE. Still dipping deep? Lower it.
+    public static double FLYWHEEL_FEED_PAUSE_RPM  = 100.0;
+    public static double FLYWHEEL_FEED_RESUME_RPM = 40.0;
     // The two flywheel motors are NOT mechanically connected, so each side has its own PIDF.
     // power = kF*target + kP*error + kI*integral + kD*d(error); error in wheel RPM. Tune in JoJa Flywheel Tuner.
     // 2026-10-29: old kP/kI (0.001 / 0.0005) oscillated +/-300 RPM. kF does most of the work (~0.58 power at 3400),
