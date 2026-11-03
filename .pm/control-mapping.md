@@ -11,15 +11,15 @@ Shooting is **manual**: the driver spins up and opens the stopper whenever they 
 | Left stick Y | Drive forward/back | Drivetrain | `MANUAL`, robot-centric, full speed |
 | Left stick X | Strafe left/right | Drivetrain | `MANUAL` |
 | Right stick X | Turn | Drivetrain | `MANUAL` |
-| Right trigger (hold, > 0.3) | Spin flywheel + run intake + indexer | Flywheel, Intake, Indexer | Flywheel per-side PIDF to `FLYWHEEL_TARGET_RPM`; Intake `INTAKING`; Indexer `FEEDING` (~6 V) if stopper open, `INTAKING` if closed; release → all `OFF` |
+| Right trigger (hold, > 0.3) | Spin flywheel + indexer | Flywheel, Indexer | Per-side PIDF (boost) to `FLYWHEEL_TARGET_RPM`. Indexer `FEEDING` if stopper open, `INTAKING` if closed. Intake NOT run. Keeps going 0.5 s after release |
 | Right bumper (press) | Toggle stopper | Stopper | `CLOSED` (0.25) ↔ `OPEN` (0.05). Starts `CLOSED` |
-| Left trigger (hold, > 0.3) | Intake | Intake, Indexer, Stopper | Press → stopper `CLOSED`; Intake + Indexer `INTAKING` |
+| Left trigger (hold, > 0.3) | Intake / feed | Intake, Indexer, Stopper | Flywheel off: press → stopper `CLOSED`, Intake + Indexer `INTAKING`. Flywheel on + stopper open: Indexer `FEEDING` (shoots), stopper not touched |
 | B / X (hold either) | Outtake (reverse) | Intake, Indexer | Intake `REVERSING`, Indexer `REVERSING` (stopper unchanged) |
 | Left bumper / L1 (press) | Toggle match loader | Match Loader | Toggle only. Starts `UP` (0.64); each press `DOWN` (0.29) ↔ `UP` |
 | Y (press) | Match loader middle ↔ up | Match Loader | From `MIDDLE` → `UP`; otherwise → `MIDDLE` (pollen only, no nectar) |
 | A (press) | Match loader middle ↔ down | Match Loader | From `MIDDLE` → `DOWN`; otherwise → `MIDDLE`. L1 from `MIDDLE` goes `UP` |
 
-**To shoot:** hold right trigger (spins up + runs indexer) → press right bumper to open the stopper → balls feed → press right bumper again to close.
+**To shoot:** hold right trigger (flywheel + indexer) → press right bumper to open the stopper → balls feed (hold left trigger too to run the intake roller) → press right bumper again to close. Flywheel keeps spinning 0.5 s after you let go of RT.
 
 Unused: D-pad, stick buttons, back, start. (Match loader zero offset is set in JoJa Hardware Test, not here.)
 

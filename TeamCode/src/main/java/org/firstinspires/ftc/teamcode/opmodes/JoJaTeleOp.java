@@ -35,6 +35,9 @@ public class JoJaTeleOp extends OpMode {
     private GamepadEx driverOp;
     private boolean intakeWasHeld = false; // for left-trigger press / release edges
     private final ElapsedTime loopTimer = new ElapsedTime();
+    private static final double FLYWHEEL_RUN_ON_SECONDS = 0.5; // flywheel keeps spinning this long after RT is released
+    private final ElapsedTime sinceSpinReleased = new ElapsedTime();
+    private boolean spunSinceStart = false;
 
 
     @Override
@@ -87,8 +90,14 @@ public class JoJaTeleOp extends OpMode {
         boolean intakeHeld = driverOp.getTrigger(GamepadKeys.Trigger.LEFT_TRIGGER) > TRIGGER_THRESHOLD;
 
         // ===== Manual shooting: the driver decides when to shoot =====
-        // Right trigger (hold) spins the flywheel; right bumper toggles the stopper OPEN / CLOSED.
+        // Right trigger (hold) spins the flywheel ONLY (no intake). It keeps spinning FLYWHEEL_RUN_ON_SECONDS
+        // after RT is released. Right bumper toggles the stopper OPEN / CLOSED.
         if (spinHeld) {
+            spunSinceStart = true;
+            sinceSpinReleased.reset();
+        }
+        boolean flywheelOn = spinHeld || (spunSinceStart && sinceSpinReleased.seconds() < FLYWHEEL_RUN_ON_SECONDS);
+        if (flywheelOn) {
             flywheel.spinUp();
         } else {
             flywheel.stop();
@@ -96,21 +105,22 @@ public class JoJaTeleOp extends OpMode {
         if (driverOp.wasJustPressed(GamepadKeys.Button.RIGHT_BUMPER)) {
             if (stopper.isOpen()) stopper.close(); else stopper.open();
         }
-        // Intaking closes the stopper automatically (on left-trigger press) so balls collect and hold
-        if (intakeHeld && !intakeWasHeld) stopper.close();
+        // Intaking closes the stopper automatically (on left-trigger press) so balls collect and hold.
+        // Not while the flywheel is on: then the left trigger is how you feed balls into the shooter.
+        if (intakeHeld && !intakeWasHeld && !flywheelOn) stopper.close();
         intakeWasHeld = intakeHeld;
 
-        // ===== Intake / indexer: Reverse > Intake or Spin > idle =====
+        // ===== Intake / indexer: only the left trigger runs them (Reverse > Intake > idle) =====
         if (reverseHeld) {
             intake.setState(Intake.State.REVERSING);
             indexer.setState(Indexer.State.REVERSING);
         } else if (intakeHeld) {
-            // Left trigger: intake + indexer at intake speed (stopper is closed automatically above)
+            // Left trigger: intake + indexer. Flywheel on + stopper open = shooting feed speed, otherwise intake speed.
             intake.setState(Intake.State.INTAKING);
-            indexer.setState(Indexer.State.INTAKING);
-        } else if (spinHeld) {
-            // Right trigger (flywheel) also runs the intake roller + indexer: shooting feed if stopper open, else hold
-            intake.setState(Intake.State.INTAKING);
+            indexer.setState(flywheelOn && stopper.isOpen() ? Indexer.State.FEEDING : Indexer.State.INTAKING);
+        } else if (flywheelOn) {
+            // Flywheel on: indexer runs too (feed speed if stopper open, else holds balls at the stopper). Intake stays off.
+            intake.setState(Intake.State.OFF);
             indexer.setState(stopper.isOpen() ? Indexer.State.FEEDING : Indexer.State.INTAKING);
         } else {
             intake.setState(Intake.State.OFF);
@@ -125,6 +135,8 @@ public class JoJaTeleOp extends OpMode {
         stopper.periodic();
         matchLoader.periodic();
 
+        tele.addData("Flywheel (RT)", spinHeld ? "ON (held)" : flywheelOn
+                ? String.format("ON (stops in %.1f s)", FLYWHEEL_RUN_ON_SECONDS - sinceSpinReleased.seconds()) : "OFF");
         tele.addData("Stopper (R1)", stopper.isOpen() ? "OPEN" : "CLOSED");
         tele.addData("Match loader (L1 up/down, Y mid/up, A mid/down)", matchLoader.getState());
         tele.addData("Loop", "%.1f ms", loopTimer.milliseconds());

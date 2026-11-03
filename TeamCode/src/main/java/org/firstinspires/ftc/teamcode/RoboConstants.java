@@ -58,20 +58,36 @@ public final class RoboConstants {
     public static final DcMotorSimple.Direction FLYWHEEL_RIGHT_DIRECTION = DcMotorSimple.Direction.FORWARD;
     public static final int FLYWHEEL_TPR = 28;            // bare motor encoder, ticks per motor rev
     public static double FLYWHEEL_GEAR_RATIO    = 1.0;    // motor revs per wheel rev. JoJa: 1:1
-    public static double FLYWHEEL_TARGET_RPM    = 3400; // wheel RPM (set by team 2026-10-24)
+    public static double FLYWHEEL_TARGET_RPM    = 3100; // wheel RPM (set by team 2026-10-24)
     public static double FLYWHEEL_RPM_TOLERANCE = 500.0; // tuned 2026-10-24:
     // wide so the stopper opens reliably
-    public static double FLYWHEEL_I_ZONE_RPM = 300.0;  // integral only builds within this many RPM of target
+    // 2026-10-29: zone was 300. A side that settled >300 below target never built any integral, so kI did nothing.
+    public static double FLYWHEEL_I_ZONE_RPM = 1000.0; // integral only builds within this many RPM of target (held, not reset, outside)
+    public static double FLYWHEEL_I_MAX_POWER = 0.4;   // the integral can add/remove at most this much power (anti-windup)
+    public static double FLYWHEEL_NOMINAL_VOLTAGE = 12.0; // flywheel power is scaled by this / battery voltage (voltage compensation)
+    // Fast spin-up (boost): full power until a side is within BOOST_BAND of target, then PIDF takes over.
+    // Boost only happens once per spin-up. 2026-11-02: re-entering boost (500 RPM below) made a full-power /
+    // too-little-power cycle that swung 2300-3100 RPM, so after spin-up the PIDF alone holds the speed.
+    // Overshoots past target? Raise BOOST_BAND. Still slow near the end? Lower it.
+    public static double FLYWHEEL_BOOST_BAND_RPM = 200.0;
     // The two flywheel motors are NOT mechanically connected, so each side has its own PIDF.
     // power = kF*target + kP*error + kI*integral + kD*d(error); error in wheel RPM. Tune in JoJa Flywheel Tuner.
-    public static double FLYWHEEL_LEFT_kP  = 0.001;  // tuned 2026-10-24
-    public static double FLYWHEEL_LEFT_kI  = 0.001;  // tuned 2026-10-24
+    // 2026-10-29: old kP/kI (0.001 / 0.0005) oscillated +/-300 RPM. kF does most of the work (~0.58 power at 3400),
+    // kP only fixes what kF misses, kI slowly removes the leftover (friction) error.
+    // If it still oscillates: lower kP. If it settles below target too slowly: raise kI a little.
+    // 2026-11-02: kP 0.00015 / kI 0.0003 were too weak to hold the speed (it sagged ~500 RPM). Doubled both.
+    // Shaking fast around target (+/-100 every few tenths of a second)? Lower kP. Slow drift below target? Raise kI.
+    public static double FLYWHEEL_LEFT_kP  = 0.0003;
+    public static double FLYWHEEL_LEFT_kI  = 0.0006;
     public static double FLYWHEEL_LEFT_kD  = 0.0;  // tuned 2026-10-24
     public static double FLYWHEEL_LEFT_kF  = 0.00017;  // tuned 2026-10-24
-    public static double FLYWHEEL_RIGHT_kP = 0.0005;  // tuned 2026-10-24
-    public static double FLYWHEEL_RIGHT_kI = 0.0005;  // tuned 2026-10-24
+    public static double FLYWHEEL_RIGHT_kP = 0.0003;
+    public static double FLYWHEEL_RIGHT_kI = 0.0006;
     public static double FLYWHEEL_RIGHT_kD = 0.0;  // tuned 2026-10-24
     public static double FLYWHEEL_RIGHT_kF = 0.00017;  // tuned 2026-10-24
+    // Static friction feedforward (power added whenever spinning). 0 = off. Get it from JoJa Flywheel SysId.
+    public static double FLYWHEEL_LEFT_kS  = 0.0;
+    public static double FLYWHEEL_RIGHT_kS = 0.0;
 
     // ===== Match Loader =====
     // Expansion Hub servo port 0, goBILDA positional servo
