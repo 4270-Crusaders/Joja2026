@@ -70,6 +70,15 @@ public class JoJaTeleOp extends OpMode {
         loopTimer.reset();
     }
 
+    // During INIT too, so the Graph variables show up in Panels before you press Play
+    @Override
+    public void init_loop() {
+        for (LynxModule hub : hubs) hub.clearBulkCache();
+        tele.addData(">", "Robot Ready.  Press Play.");
+        graph();
+        panels.update(telemetry);
+    }
+
     @Override
     public void loop() {
         for (LynxModule hub : hubs) hub.clearBulkCache(); // fresh sensor readings this loop
@@ -169,6 +178,7 @@ public class JoJaTeleOp extends OpMode {
     }
 
     @Override
+
     public void stop() {
         drivetrain.stop();
         flywheel.stop();

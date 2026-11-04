@@ -108,6 +108,18 @@ public final class RoboConstants {
     // Adjust live in JoJa Tele with the D-pad, then copy the value shown on the Driver Hub here.
     public static double MATCH_LOADER_OFFSET = 0.0;
 
+    // ===== Odometry (goBILDA Pinpoint + 2 pods) =====
+    // Control Hub I2C bus 1. Driver Hub config: "goBILDA Pinpoint Odometry Computer" named "pinpoint"
+    public static final String PINPOINT_NAME = "pinpoint";
+    public static boolean PINPOINT_4_BAR_POD = true;  // true = 4-Bar Odometry Pod, false = Swingarm Pod. VERIFY
+    // Offsets from the robot center, inches. PLACEHOLDERS (0) until measured:
+    // X offset = how far LEFT (+) / right (-) the FORWARD pod (X port) is. Y offset = how far FORWARD (+) / back (-) the STRAFE pod (Y port) is.
+    public static double PINPOINT_X_OFFSET_IN = 0.0;
+    public static double PINPOINT_Y_OFFSET_IN = 0.0;
+    // Push robot forward: X should go UP. Push left: Y should go UP. If not, flip it (JoJa Odometry Test D-pad L/R).
+    public static boolean PINPOINT_X_REVERSED = false;
+    public static boolean PINPOINT_Y_REVERSED = false;
+
     // ====== Utilities ======
     public static final double LOOP_HZ = 50.0;
     public static final double dt(ElapsedTime t) { return t.seconds(); }

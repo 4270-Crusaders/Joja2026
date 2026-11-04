@@ -4,6 +4,9 @@ import com.pedropathing.follower.Follower;
 import com.pedropathing.follower.FollowerConstants;
 import com.pedropathing.ftc.drivetrains.MecanumConstants;
 import com.pedropathing.ftc.localization.Encoder;
+import com.pedropathing.ftc.localization.constants.PinpointConstants;
+import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import com.pedropathing.paths.PathConstraints;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.hardware.HardwareMap;
@@ -74,6 +77,30 @@ public class Constants {
             .strafeTicksToInches(TICKS_TO_INCHES)   // refine with Tuning > LateralTuner
             .forwardTicksToInches(TICKS_TO_INCHES); // refine with Tuning > ForwardTuner
 //            .turnTicksToRadians(0.09); //uses imu :)
+
+    /**
+     * Follower that tracks position with the goBILDA Pinpoint + 2 odometry pods (settings in RoboConstants PINPOINT_...).
+     * Used by the JoJa Loc Test autos. Once those check out, createFollower() switches to this too.
+     */
+    public static Follower createPinpointFollower(HardwareMap hardwareMap) {
+        PinpointConstants pinpoint = new PinpointConstants()
+                .hardwareMapName(RoboConstants.PINPOINT_NAME)
+                .distanceUnit(DistanceUnit.INCH)
+                .forwardPodY(RoboConstants.PINPOINT_X_OFFSET_IN)  // forward pod: left (+) / right (-) of center
+                .strafePodX(RoboConstants.PINPOINT_Y_OFFSET_IN)   // strafe pod: forward (+) / back (-) of center
+                .encoderResolution(RoboConstants.PINPOINT_4_BAR_POD
+                        ? GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD
+                        : GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_SWINGARM_POD)
+                .forwardEncoderDirection(RoboConstants.PINPOINT_X_REVERSED
+                        ? GoBildaPinpointDriver.EncoderDirection.REVERSED : GoBildaPinpointDriver.EncoderDirection.FORWARD)
+                .strafeEncoderDirection(RoboConstants.PINPOINT_Y_REVERSED
+                        ? GoBildaPinpointDriver.EncoderDirection.REVERSED : GoBildaPinpointDriver.EncoderDirection.FORWARD);
+        return new MyFollowerBuilder(followerConstants, hardwareMap)
+                .pinpointLocalizer(pinpoint)
+                .pathConstraints(pathConstraints)
+                .mecanumDrivetrain(driveConstants)
+                .build();
+    }
 
     public static Follower createFollower(HardwareMap hardwareMap, Telemetry tele) {
         return new MyFollowerBuilder(followerConstants, hardwareMap)
