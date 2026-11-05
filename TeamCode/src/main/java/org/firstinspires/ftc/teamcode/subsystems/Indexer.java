@@ -4,6 +4,7 @@ import com.arcrobotics.ftclib.command.SubsystemBase;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
+import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.RobotLog;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
@@ -19,6 +20,7 @@ public class Indexer extends SubsystemBase {
         OFF,
         INTAKING,
         FEEDING,
+        FEEDING_SLOW, // shooting, but the flywheel is recovering from the last ball: keep moving slowly, don't stop
         REVERSING
     }
 
@@ -26,6 +28,8 @@ public class Indexer extends SubsystemBase {
     private final DcMotorEx motor;
     private final VoltageSensor voltageSensor;
     private State state = State.OFF;
+    private double appliedPower = 0.0;              // ramped power actually sent to the motor
+    private final ElapsedTime rampTimer = new ElapsedTime();
 
     public Indexer(final HardwareMap hMap, final String motorName, Telemetry telemetry) {
         this.telemetry = telemetry;
@@ -51,22 +55,37 @@ public class Indexer extends SubsystemBase {
 
     private double powerFor(State s) {
         switch (s) {
-            case INTAKING:  return RoboConstants.INDEXER_INTAKE_POWER;
-            case FEEDING:   return RoboConstants.INDEXER_FEED_POWER;
-            case REVERSING: return RoboConstants.INDEXER_REVERSE_POWER;
+            case INTAKING:     return RoboConstants.INDEXER_INTAKE_POWER;
+            case FEEDING:      return RoboConstants.INDEXER_FEED_POWER;
+            case FEEDING_SLOW: return RoboConstants.INDEXER_FEED_SLOW_POWER;
+            case REVERSING:    return RoboConstants.INDEXER_REVERSE_POWER;
             case OFF:
-            default:        return 0.0;
+            default:           return 0.0;
         }
     }
 
     @Override
     public void periodic() {
         // Read constants every loop so Panels edits take effect live.
-        double power = powerFor(state);
-        motor.setPower(power);
+        double target = powerFor(state);
+        double dt = Math.min(rampTimer.seconds(), 0.1); // cap: a long gap between loops shouldn't skip the ramp
+        rampTimer.reset();
+
+        // Ramp: speeding up is limited to INDEXER_RAMP_PER_SEC (no current spike); slowing down / stopping is instant.
+        // Changing direction (e.g. feed -> reverse) drops to 0 first, then ramps up the other way.
+        boolean sameDirection = target * appliedPower >= 0;
+        if (!sameDirection) appliedPower = 0.0;
+        if (Math.abs(target) <= Math.abs(appliedPower) || RoboConstants.INDEXER_RAMP_PER_SEC <= 0) {
+            appliedPower = target;
+        } else {
+            double step = RoboConstants.INDEXER_RAMP_PER_SEC * dt;
+            appliedPower += Math.signum(target) * Math.min(step, Math.abs(target - appliedPower));
+        }
+        motor.setPower(appliedPower);
 
         telemetry.addLine("====== Indexer ======");
         telemetry.addData("Indexer/State", state);
-        telemetry.addData("Indexer/Power", "%.2f", power);
+        telemetry.addData("Indexer/Power", "%.2f", appliedPower);
+        telemetry.addData("Indexer/Target power", "%.2f", target);
     }
 }

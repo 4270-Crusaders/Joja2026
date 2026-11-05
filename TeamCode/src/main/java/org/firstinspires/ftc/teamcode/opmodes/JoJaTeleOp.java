@@ -130,7 +130,8 @@ public class JoJaTeleOp extends OpMode {
         flywheel.setShooting(stopper.isOpen());
         // Feed gate: while a side is still recovering from the last ball, the indexer pauses so the next ball
         // doesn't hit an already-slow wheel (that's what took it down to ~2800)
-        Indexer.State shootFeed = flywheel.readyToFeed() ? Indexer.State.FEEDING : Indexer.State.OFF;
+        // It slows down (FEEDING_SLOW) instead of stopping: restarting from a dead stop browned out the hub.
+        Indexer.State shootFeed = flywheel.readyToFeed() ? Indexer.State.FEEDING : Indexer.State.FEEDING_SLOW;
 
         // ===== Intake / indexer: only the left trigger runs them (Reverse > Intake > idle) =====
         if (reverseHeld) {
@@ -138,11 +139,13 @@ public class JoJaTeleOp extends OpMode {
             indexer.setState(Indexer.State.REVERSING);
         } else if (intakeHeld) {
             // Left trigger: intake + indexer. Flywheel on + stopper open = shooting feed speed, otherwise intake speed.
-            intake.setState(Intake.State.INTAKING);
-            indexer.setState(flywheelOn && stopper.isOpen() ? shootFeed : Indexer.State.INTAKING);
+            boolean shootingNow = flywheelOn && stopper.isOpen();
+            intake.setState(shootingNow ? Intake.State.SHOOTING : Intake.State.INTAKING);
+            indexer.setState(shootingNow ? shootFeed : Indexer.State.INTAKING);
         } else if (flywheelOn) {
-            // Flywheel on: indexer runs too (feed speed if stopper open, else holds balls at the stopper). Intake stays off.
-            intake.setState(Intake.State.OFF);
+            // Flywheel on: indexer runs too (feed speed if stopper open, else holds balls at the stopper).
+            // Shooting (stopper open): intake runs at INTAKE_SHOOT_POWER to keep balls coming. Otherwise off.
+            intake.setState(stopper.isOpen() ? Intake.State.SHOOTING : Intake.State.OFF);
             indexer.setState(stopper.isOpen() ? shootFeed : Indexer.State.INTAKING);
         } else {
             intake.setState(Intake.State.OFF);
@@ -169,12 +172,22 @@ public class JoJaTeleOp extends OpMode {
 
     /**
      * Panels graph: plain number values, so the Graph tab can plot them.
-     * In Panels open Graph and pick "Graph/Target RPM", "Graph/Left RPM", "Graph/Right RPM".
+     * In Panels open Graph and pick "Graph/Target RPM", "Graph/Left RPM", "Graph/Right RPM", "Graph/Top", "Graph/Bottom".
+     *
+     * Zoom: the Panels graph has no y-axis setting, it always fits whatever lines are ticked. So the RPM lines are
+     * clamped to TARGET +/- GRAPH_RPM_WINDOW, and Top / Bottom are flat lines at the window edges. With all five
+     * ticked, the y-axis stays fixed on the target window instead of 0 to max. A line sitting flat on Top or Bottom
+     * means the real RPM is outside the window (e.g. at 0 during spin-up); the Driver Hub still shows the real value.
      */
     private void graph() {
-        panels.addData("Graph/Target RPM", Math.round(flywheel.getTargetRpm()));
-        panels.addData("Graph/Left RPM", Math.round(flywheel.getLeftRpm()));
-        panels.addData("Graph/Right RPM", Math.round(flywheel.getRightRpm()));
+        double target = flywheel.getTargetRpm();
+        double lo = target - RoboConstants.GRAPH_RPM_WINDOW;
+        double hi = target + RoboConstants.GRAPH_RPM_WINDOW;
+        panels.addData("Graph/Target RPM", Math.round(target));
+        panels.addData("Graph/Left RPM", Math.round(Math.max(lo, Math.min(hi, flywheel.getLeftRpm()))));
+        panels.addData("Graph/Right RPM", Math.round(Math.max(lo, Math.min(hi, flywheel.getRightRpm()))));
+        panels.addData("Graph/Top", Math.round(hi));
+        panels.addData("Graph/Bottom", Math.round(lo));
     }
 
     @Override

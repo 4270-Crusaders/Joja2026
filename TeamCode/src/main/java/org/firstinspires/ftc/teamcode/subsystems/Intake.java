@@ -17,6 +17,7 @@ public class Intake extends SubsystemBase {
     public enum State {
         OFF,
         INTAKING,
+        SHOOTING, // shooting without the left trigger: INTAKE_SHOOT_POWER
         REVERSING
     }
 
@@ -44,6 +45,9 @@ public class Intake extends SubsystemBase {
         switch (state) {
             case INTAKING:
                 power = RoboConstants.INTAKE_POWER;
+                break;
+            case SHOOTING:
+                power = RoboConstants.INTAKE_SHOOT_POWER;
                 break;
             case REVERSING:
                 power = RoboConstants.INTAKE_REVERSE_POWER;

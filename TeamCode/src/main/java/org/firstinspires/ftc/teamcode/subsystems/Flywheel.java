@@ -29,6 +29,8 @@ public class Flywheel extends SubsystemBase {
         final DcMotorEx motor;
         final boolean isLeft;
         double integral = 0.0, prevErr = 0.0, rpm = 0.0, pwr = 0.0, iPwr = 0.0;
+        double prevRpm = 0.0, accel = 0.0;           // accel = smoothed RPM per second (+ speeding up, - slowing)
+        double pPwr = 0.0, vPwr = 0.0, aPwr = 0.0;   // each term's power, for telemetry
         boolean boosting = false;   // full power until close to target
         boolean recovering = false; // full power after a shot slowed it
 
@@ -37,8 +39,17 @@ public class Flywheel extends SubsystemBase {
         double kP() { return isLeft ? RoboConstants.FLYWHEEL_LEFT_kP : RoboConstants.FLYWHEEL_RIGHT_kP; }
         double kI() { return isLeft ? RoboConstants.FLYWHEEL_LEFT_kI : RoboConstants.FLYWHEEL_RIGHT_kI; }
         double kD() { return isLeft ? RoboConstants.FLYWHEEL_LEFT_kD : RoboConstants.FLYWHEEL_RIGHT_kD; }
-        double kF() { return isLeft ? RoboConstants.FLYWHEEL_LEFT_kF : RoboConstants.FLYWHEEL_RIGHT_kF; }
+        double kV() { return isLeft ? RoboConstants.FLYWHEEL_LEFT_kV : RoboConstants.FLYWHEEL_RIGHT_kV; }
         double kS() { return isLeft ? RoboConstants.FLYWHEEL_LEFT_kS : RoboConstants.FLYWHEEL_RIGHT_kS; }
+        double kA() { return isLeft ? RoboConstants.FLYWHEEL_LEFT_kA : RoboConstants.FLYWHEEL_RIGHT_kA; }
+
+        /** Smoothed acceleration from the change in RPM since last loop. */
+        void updateAccel(double dt) {
+            double raw = (rpm - prevRpm) / dt;
+            prevRpm = rpm;
+            double a = RoboConstants.FLYWHEEL_ACCEL_SMOOTHING;
+            accel = a * raw + (1 - a) * accel;
+        }
 
         /** Wheel RPM = motor RPM / gear ratio (gear ratio = motor revs per wheel rev). */
         double readRpm() {
@@ -49,6 +60,9 @@ public class Flywheel extends SubsystemBase {
         void reset(double target) {
             // Keep the integral from last time: it's the extra power this side needs (friction),
             // so PIDF starts with it instead of building it up from 0 again after every spin-up.
+            // But never carry a NEGATIVE integral into a new spin-up (2026-11-04 stall fix): a negative integral
+            // takes power away, so the wheel came out of boost with too little power and sagged / stalled.
+            integral = Math.max(0.0, integral);
             boosting = true;
             prevErr = target - readRpm(); // seed so the first derivative term doesn't spike
         }
@@ -101,6 +115,8 @@ public class Flywheel extends SubsystemBase {
 
     private boolean shooting = false, wasShooting = false;
     private boolean feedOk = false; // see readyToFeed()
+    private boolean feedOverride = false; // paused too long: feed anyway until speed is back
+    private final ElapsedTime pauseTimer = new ElapsedTime();
     private double minShotL = 0.0, minShotR = 0.0;
 
     private static String mode(Side s) {
@@ -148,7 +164,11 @@ public class Flywheel extends SubsystemBase {
 
         // Only build up integral near the target so spin-up from 0 doesn't wind it up and overshoot.
         // This is what lets the higher-friction side close the last gap to the target.
-        if (Math.abs(err) <= RoboConstants.FLYWHEEL_I_ZONE_RPM) {
+        // 2026-11-04 stall fix: NOT while shooting. Then every dip below RECOVERY_BAND gets full power (above, no
+        // integral), so the integral only ever saw the overshoots ABOVE target. It ratcheted down to -I_MAX_POWER,
+        // pulled ~0.4 power out, and the wheel stalled / sagged after a volley (and on the next spin-up, since the
+        // integral is kept). While shooting, the integral is frozen at its pre-shot value (the friction it learned).
+        if (!shooting && Math.abs(err) <= RoboConstants.FLYWHEEL_I_ZONE_RPM) {
             s.integral += err * dt;
         } else {
             // Hold the integral (don't wipe it): wiping it when a ball hits or the speed swings past the zone
@@ -163,8 +183,10 @@ public class Flywheel extends SubsystemBase {
         s.prevErr = err;
 
         s.iPwr = s.kI() * s.integral;
-        double ff = (target > 0) ? s.kS() + s.kF() * target : 0.0;
-        double pwr = s.kP() * err + s.iPwr + s.kD() * deriv + ff;
+        s.vPwr = (target > 0) ? s.kS() + s.kV() * target : 0.0;   // velocity feedforward
+        s.aPwr = s.kA() * Math.max(0.0, -s.accel);                  // acceleration: push back while it's slowing
+        s.pPwr = s.kP() * err;
+        double pwr = s.pPwr + s.iPwr + s.kD() * deriv + s.vPwr + s.aPwr;
         // Voltage compensation: gains are tuned for FLYWHEEL_NOMINAL_VOLTAGE. When the drive/intake sag the battery
         // in TeleOp, scale the power up so the motor still gets the same volts.
         pwr *= RoboConstants.FLYWHEEL_NOMINAL_VOLTAGE / batteryVolts;
@@ -180,6 +202,8 @@ public class Flywheel extends SubsystemBase {
         // Real loop time, so the integral grows at the same speed in TeleOp (slow loop) as in the Tuner (fast loop)
         dt = Math.max(0.005, Math.min(0.1, loopTimer.seconds()));
         loopTimer.reset();
+        left.updateAccel(dt);
+        right.updateAccel(dt);
         if (battery != null) {
             double v = battery.getVoltage();
             if (v > 6.0) batteryVolts = 0.8 * batteryVolts + 0.2 * v; // smooth out spikes
@@ -187,8 +211,20 @@ public class Flywheel extends SubsystemBase {
 
         // Feed gate, with a gap between pause and resume so it doesn't flicker on/off
         double worstErr = target - Math.min(left.rpm, right.rpm);
-        if (state == State.OFF || worstErr > RoboConstants.FLYWHEEL_FEED_PAUSE_RPM) feedOk = false;
-        else if (worstErr < RoboConstants.FLYWHEEL_FEED_RESUME_RPM) feedOk = true;
+        boolean wasOk = feedOk;
+        if (worstErr < RoboConstants.FLYWHEEL_FEED_RESUME_RPM) feedOverride = false; // speed is back: normal again
+        if (state == State.OFF) {
+            feedOk = false;
+            feedOverride = false;
+        } else if (worstErr > RoboConstants.FLYWHEEL_FEED_PAUSE_RPM) {
+            feedOk = false;
+        } else if (worstErr < RoboConstants.FLYWHEEL_FEED_RESUME_RPM) {
+            feedOk = true;
+        }
+        if (wasOk && !feedOk) pauseTimer.reset();
+        // Never pause longer than FEED_MAX_PAUSE_S (a ball stuck on the wheel would stall it forever)
+        if (!feedOk && state != State.OFF && pauseTimer.seconds() > RoboConstants.FLYWHEEL_FEED_MAX_PAUSE_S) feedOverride = true;
+        if (feedOverride) feedOk = true;
 
         if (state == State.OFF) {
             left.pwr = 0.0;
@@ -211,19 +247,30 @@ public class Flywheel extends SubsystemBase {
         telemetry.addLine("====== Flywheel ======");
         telemetry.addData("Flywheel/State", state);
         telemetry.addData("Flywheel/Boost L / R", "%s / %s", mode(left), mode(right));
-        telemetry.addData("Flywheel/Feed", feedOk ? "GO" : "WAIT (speed recovering)");
-        telemetry.addData("Flywheel/Lowest RPM L / R (while shooting)", "%.0f / %.0f", minShotL, minShotR);
+        telemetry.addData("Flywheel/Feed", feedOverride ? "GO (pause too long, pushing through)" : feedOk ? "GO" : "WAIT (speed recovering)");
+        telemetry.addData("Flywheel/Lowest RPM L (while shooting)", "%.0f", minShotL);
+        telemetry.addData("Flywheel/Lowest RPM R (while shooting)", "%.0f", minShotR);
         telemetry.addData("Flywheel/TargetRPM", "%.0f", target);
         // One number per line so Panels can graph each side
         telemetry.addData("Flywheel/RPM L", "%.0f", left.rpm);
         telemetry.addData("Flywheel/RPM R", "%.0f", right.rpm);
         telemetry.addData("Flywheel/Power L", "%.3f", left.pwr);
         telemetry.addData("Flywheel/Power R", "%.3f", right.pwr);
-        // How much power kF alone gives, and how much the integral adds (if I power sits at the cap, raise kF)
-        telemetry.addData("Flywheel/kF power L", "%.3f", RoboConstants.FLYWHEEL_LEFT_kS + RoboConstants.FLYWHEEL_LEFT_kF * target);
-        telemetry.addData("Flywheel/kF power R", "%.3f", RoboConstants.FLYWHEEL_RIGHT_kS + RoboConstants.FLYWHEEL_RIGHT_kF * target);
+        // How much power kV alone gives, and how much the integral adds (if I power sits at the cap, raise kV)
+        // Velocity / acceleration: accel < 0 = slowing down (a POLLEN hit). A big negative spike = how hard the hit was.
+        telemetry.addData("Flywheel/Accel L", "%.0f", left.accel);   // RPM per second
+        telemetry.addData("Flywheel/Accel R", "%.0f", right.accel);
+        // Power from each term (before the battery scaling). Power 1.000 with mode FULL = already maxed out.
+        // One number per line, or the Panels graph can't pick it up
+        telemetry.addData("Flywheel/kS+kV power L", "%.3f", left.vPwr);
+        telemetry.addData("Flywheel/kS+kV power R", "%.3f", right.vPwr);
+        telemetry.addData("Flywheel/kA power L", "%.3f", left.aPwr);
+        telemetry.addData("Flywheel/kA power R", "%.3f", right.aPwr);
+        telemetry.addData("Flywheel/kP power L", "%.3f", left.pPwr);
+        telemetry.addData("Flywheel/kP power R", "%.3f", right.pPwr);
         telemetry.addData("Flywheel/I power L", "%.3f", left.iPwr);
         telemetry.addData("Flywheel/I power R", "%.3f", right.iPwr);
-        telemetry.addData("Flywheel/Loop", "%.0f ms   battery %.2f V", dt * 1000.0, batteryVolts);
+        telemetry.addData("Flywheel/Loop ms", "%.0f", dt * 1000.0);
+        telemetry.addData("Flywheel/Battery V", "%.2f", batteryVolts);
     }
 }

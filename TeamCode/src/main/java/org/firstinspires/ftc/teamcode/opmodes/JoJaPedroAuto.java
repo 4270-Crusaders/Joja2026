@@ -217,10 +217,10 @@ public abstract class JoJaPedroAuto extends OpMode {
             public void start() {
                 flywheel.spinUp();
                 stopper.open();
-                intake.setState(Intake.State.INTAKING);
+                intake.setState(Intake.State.SHOOTING); // INTAKE_SHOOT_POWER while shooting
             }
             public boolean isDone() {
-                indexer.setState(flywheel.readyToFeed() ? Indexer.State.FEEDING : Indexer.State.OFF);
+                indexer.setState(flywheel.readyToFeed() ? Indexer.State.FEEDING : Indexer.State.FEEDING_SLOW);
                 if (stepTimer.seconds() < seconds) return false;
                 flywheel.stop();
                 stopper.close();

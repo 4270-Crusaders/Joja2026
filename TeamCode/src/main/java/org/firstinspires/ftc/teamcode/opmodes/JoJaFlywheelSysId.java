@@ -28,7 +28,7 @@ import java.util.List;
  * Results are shown in two forms:
  *   - SysId units (volts, RPM): kS [V], kV [V/RPM], kA [V/(RPM/s)]
  *   - JoJa Flywheel units (motor power 0..1, at the battery voltage measured during the test):
- *     kS, kF, kP, kI, kD -> what goes into RoboConstants.FLYWHEEL_LEFT_* / FLYWHEEL_RIGHT_*
+ *     kS, kV, kP, kI, kD -> what goes into RoboConstants.FLYWHEEL_LEFT_* / FLYWHEEL_RIGHT_*
  *
  * Controls: Play, then A = start. B = abort at any time. After the test: Y = apply the results live
  * (until the app restarts) so you can try them right away in JoJa Flywheel Tuner.
@@ -228,13 +228,15 @@ public class JoJaFlywheelSysId extends LinearOpMode {
     private void apply(Result res, boolean isLeft) {
         if (isLeft) {
             RoboConstants.FLYWHEEL_LEFT_kS = res.pS;
-            RoboConstants.FLYWHEEL_LEFT_kF = res.pF;
+            RoboConstants.FLYWHEEL_LEFT_kV = res.pF;
+            RoboConstants.FLYWHEEL_LEFT_kA = res.kA / averageBattery(); // volts -> power
             RoboConstants.FLYWHEEL_LEFT_kP = res.pP;
             RoboConstants.FLYWHEEL_LEFT_kI = res.pI;
             RoboConstants.FLYWHEEL_LEFT_kD = res.pD;
         } else {
             RoboConstants.FLYWHEEL_RIGHT_kS = res.pS;
-            RoboConstants.FLYWHEEL_RIGHT_kF = res.pF;
+            RoboConstants.FLYWHEEL_RIGHT_kV = res.pF;
+            RoboConstants.FLYWHEEL_RIGHT_kA = res.kA / averageBattery(); // volts -> power
             RoboConstants.FLYWHEEL_RIGHT_kP = res.pP;
             RoboConstants.FLYWHEEL_RIGHT_kI = res.pI;
             RoboConstants.FLYWHEEL_RIGHT_kD = res.pD;
@@ -255,7 +257,8 @@ public class JoJaFlywheelSysId extends LinearOpMode {
         tele.addData("SysId kV", "%.6f V/RPM", res.kV);
         tele.addData("SysId kA", "%.6f V/(RPM/s)  (tau %.2f s)", res.kA, res.tau);
         tele.addData("JoJa kS", "%.4f", res.pS);
-        tele.addData("JoJa kF", "%.7f", res.pF);
+        tele.addData("JoJa kV", "%.7f", res.pF);
+        tele.addData("JoJa kA", "%.7f", res.kA / averageBattery());
         tele.addData("JoJa kP", "%.7f", res.pP);
         tele.addData("JoJa kI", "%.7f", res.pI);
         tele.addData("JoJa kD", "%.1f", res.pD);
@@ -268,7 +271,7 @@ public class JoJaFlywheelSysId extends LinearOpMode {
         }
         RobotLog.i(String.format("[SysId] %s SysId: kS=%.3f V kV=%.6f V/RPM kA=%.6f V/(RPM/s) tau=%.3f s (battery %.2f V)",
                 res.name, res.kS, res.kV, res.kA, res.tau, averageBattery()));
-        RobotLog.i(String.format("[SysId] %s JoJa: kS=%.4f kF=%.7f kP=%.7f kI=%.7f kD=%.1f",
+        RobotLog.i(String.format("[SysId] %s JoJa: kS=%.4f kV=%.7f kP=%.7f kI=%.7f kD=%.1f",
                 res.name, res.pS, res.pF, res.pP, res.pI, res.pD));
     }
 

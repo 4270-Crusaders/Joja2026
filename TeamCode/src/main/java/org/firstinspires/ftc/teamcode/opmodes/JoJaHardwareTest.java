@@ -74,7 +74,7 @@ public class JoJaHardwareTest extends OpMode {
     //   Y                set target to 85% of the slower side's max seen (do a full-trigger run first)
     //   X                reset the max-seen RPM
     //   R1               stopper OPEN / CLOSED         Left trigger   feed balls (intake + indexer FEED)
-    // Gains (kP/kI/kF, tolerance) are live-editable in Panels > Configurables > RoboConstants.
+    // Gains (kP/kI/kV, tolerance) are live-editable in Panels > Configurables > RoboConstants.
     private static final boolean FLYWHEEL_TUNING_MODE = false; // flywheel tuning now has its own OpMode: JoJa Flywheel Tuner
     private static final double STICK_THRESHOLD = 0.5;
     private static final double DRIVE_TEST_SCALE = 0.6; // drive mode speed (JoJa Tele is full speed)
@@ -425,13 +425,13 @@ public class JoJaHardwareTest extends OpMode {
             tele.addLine("!! Target is too close to the slower side's max: it can't hold it. Press Y.");
         }
         if (openLoop && rpmL > 100 && rpmR > 100) {
-            // kF here is power per RPM, so a good starting kF = power / RPM it produces
-            tele.addData("kF suggest L / R", "%.6f / %.6f", rt / rpmL, rt / rpmR);
+            // kV here is power per RPM, so a good starting kV = power / RPM it produces
+            tele.addData("kV suggest L / R", "%.6f / %.6f", rt / rpmL, rt / rpmR);
         }
-        tele.addData("Gains L", "kP %.5f  kI %.5f  kF %.6f", RoboConstants.FLYWHEEL_LEFT_kP,
-                RoboConstants.FLYWHEEL_LEFT_kI, RoboConstants.FLYWHEEL_LEFT_kF);
-        tele.addData("Gains R", "kP %.5f  kI %.5f  kF %.6f", RoboConstants.FLYWHEEL_RIGHT_kP,
-                RoboConstants.FLYWHEEL_RIGHT_kI, RoboConstants.FLYWHEEL_RIGHT_kF);
+        tele.addData("Gains L", "kP %.5f  kI %.5f  kV %.6f", RoboConstants.FLYWHEEL_LEFT_kP,
+                RoboConstants.FLYWHEEL_LEFT_kI, RoboConstants.FLYWHEEL_LEFT_kV);
+        tele.addData("Gains R", "kP %.5f  kI %.5f  kV %.6f", RoboConstants.FLYWHEEL_RIGHT_kP,
+                RoboConstants.FLYWHEEL_RIGHT_kI, RoboConstants.FLYWHEEL_RIGHT_kV);
         tele.addData("Stopper", stopperOpen ? "OPEN" : "CLOSED");
         panels.update(telemetry);
     }

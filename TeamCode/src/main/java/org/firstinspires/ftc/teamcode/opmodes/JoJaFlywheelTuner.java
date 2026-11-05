@@ -63,10 +63,10 @@ public class JoJaFlywheelTuner extends OpMode {
         tele.addData("Error L", "%.0f", RoboConstants.FLYWHEEL_TARGET_RPM - flywheel.getLeftRpm());
         tele.addData("Error R", "%.0f", RoboConstants.FLYWHEEL_TARGET_RPM - flywheel.getRightRpm());
         tele.addData("At speed (both)", flywheel.isAtSpeed());
-        tele.addData("Left  kP/kI/kD/kF", "%.5f  %.5f  %.5f  %.6f", RoboConstants.FLYWHEEL_LEFT_kP,
-                RoboConstants.FLYWHEEL_LEFT_kI, RoboConstants.FLYWHEEL_LEFT_kD, RoboConstants.FLYWHEEL_LEFT_kF);
-        tele.addData("Right kP/kI/kD/kF", "%.5f  %.5f  %.5f  %.6f", RoboConstants.FLYWHEEL_RIGHT_kP,
-                RoboConstants.FLYWHEEL_RIGHT_kI, RoboConstants.FLYWHEEL_RIGHT_kD, RoboConstants.FLYWHEEL_RIGHT_kF);
+        tele.addData("Left  kP/kI/kD/kV", "%.5f  %.5f  %.5f  %.6f", RoboConstants.FLYWHEEL_LEFT_kP,
+                RoboConstants.FLYWHEEL_LEFT_kI, RoboConstants.FLYWHEEL_LEFT_kD, RoboConstants.FLYWHEEL_LEFT_kV);
+        tele.addData("Right kP/kI/kD/kV", "%.5f  %.5f  %.5f  %.6f", RoboConstants.FLYWHEEL_RIGHT_kP,
+                RoboConstants.FLYWHEEL_RIGHT_kI, RoboConstants.FLYWHEEL_RIGHT_kD, RoboConstants.FLYWHEEL_RIGHT_kV);
         panels.update(telemetry);
     }
 

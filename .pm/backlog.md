@@ -29,7 +29,7 @@ All ports below are the team's actual wiring (confirmed 2026-10-23). Names are P
 | Right front drive | goBILDA 5203 435 RPM | `rightFront` | Expansion Hub | Motor 1 |
 | Right back drive | goBILDA 5203 435 RPM | `rightBack` | Expansion Hub | Motor 0 |
 | Intake | goBILDA 5203 1150 RPM | `intake` | Expansion Hub | Motor 3 |
-| Indexer | goBILDA 5203 1150 RPM | `indexer` | Control Hub | Motor 3 |
+| Indexer | goBILDA 5203 3.7:1 (~1620 RPM) | `indexer` | Control Hub | Motor 3 |
 | Flywheel left | goBILDA 5203 bare (6000 RPM, 28 TPR) | `flywheelLeft` | Control Hub | Motor 2 |
 | Flywheel right | goBILDA 5203 bare (6000 RPM, 28 TPR) | `flywheelRight` | Expansion Hub | Motor 2 |
 | Ball stopper | goBILDA positional servo | `stopper` | Control Hub | Servo 0 |
@@ -103,7 +103,7 @@ Transitions: set directly by the OpMode via `setState(...)` each loop (see Coord
 
 Dumper-style: holds **4 balls**, takes in everything, shoots everything at once.
 
-**Motors:** `indexer` — 5203 1150 RPM, CH M3, default direction FORWARD (verify: positive = moves balls toward the shooter). Plain power, no velocity control. Zero-power BRAKE (so balls don't drift into the stopper).
+**Motors:** `indexer` — 5203 3.7:1 (~1620 RPM, was 1150 until 2026-11-04), CH M3, default direction FORWARD (verify: positive = moves balls toward the shooter). Plain power, no velocity control. Zero-power BRAKE (so balls don't drift into the stopper).
 
 **Sensors:** none (no ball counting).
 
