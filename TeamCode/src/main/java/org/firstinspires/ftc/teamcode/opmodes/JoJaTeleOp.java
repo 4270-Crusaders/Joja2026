@@ -17,6 +17,8 @@ import org.firstinspires.ftc.teamcode.subsystems.Indexer;
 import org.firstinspires.ftc.teamcode.subsystems.Intake;
 import org.firstinspires.ftc.teamcode.subsystems.MatchLoader;
 import org.firstinspires.ftc.teamcode.subsystems.Stopper;
+import org.firstinspires.ftc.teamcode.utils.CurrentMonitor;
+import org.firstinspires.ftc.teamcode.utils.LoopTimer;
 
 @TeleOp(name="JoJa Tele", group="Competition")
 public class JoJaTeleOp extends OpMode {
@@ -35,11 +37,12 @@ public class JoJaTeleOp extends OpMode {
     // ===== Utils =====
     private GamepadEx driverOp;
     private boolean intakeWasHeld = false; // for left-trigger press / release edges
-    private final ElapsedTime loopTimer = new ElapsedTime();
+    private LoopTimer loopTimer; // 5-10 ms loop, telemetry every 50 ms (see utils/LoopTimer)
     private static final double FLYWHEEL_RUN_ON_SECONDS = 0.5; // flywheel keeps spinning this long after RT is released
     private final ElapsedTime sinceSpinReleased = new ElapsedTime();
     private boolean spunSinceStart = false;
     private java.util.List<LynxModule> hubs;
+    private CurrentMonitor amps; // RoboConstants.CURRENT_MONITOR: amps per motor on the Driver Hub / Panels
 
 
     @Override
@@ -64,10 +67,23 @@ public class JoJaTeleOp extends OpMode {
 
         // util
         driverOp = new GamepadEx(gamepad1);
+        amps = new CurrentMonitor()
+                .add(hardwareMap, "Flywheel L", RoboConstants.FLYWHEEL_LEFT_MOTOR_NAME)
+                .add(hardwareMap, "Flywheel R", RoboConstants.FLYWHEEL_RIGHT_MOTOR_NAME)
+                .add(hardwareMap, "Indexer", RoboConstants.INDEXER_MOTOR_NAME)
+                .add(hardwareMap, "Intake", RoboConstants.INTAKE_MOTOR_NAME)
+                .add(hardwareMap, "Drive LF", RoboConstants.DRIVE_LEFT_FRONT_NAME)
+                .add(hardwareMap, "Drive LB", RoboConstants.DRIVE_LEFT_BACK_NAME)
+                .add(hardwareMap, "Drive RF", RoboConstants.DRIVE_RIGHT_FRONT_NAME)
+                .add(hardwareMap, "Drive RB", RoboConstants.DRIVE_RIGHT_BACK_NAME);
 
         tele.addData(">", "Robot Ready.  Press Play.");
         panels.update(telemetry);
-        loopTimer.reset();
+    }
+
+    @Override
+    public void start() {
+        loopTimer = new LoopTimer();
     }
 
     // During INIT too, so the Graph variables show up in Panels before you press Play
@@ -81,7 +97,8 @@ public class JoJaTeleOp extends OpMode {
 
     @Override
     public void loop() {
-        for (LynxModule hub : hubs) hub.clearBulkCache(); // fresh sensor readings this loop
+        loopTimer.tick(); // steady loop time + decides if this is a telemetry loop
+        for (LynxModule hub : hubs) hub.clearBulkCache(); // fresh sensor readings this loop (one read per hub)
         driverOp.readButtons();
 
         /*
@@ -131,7 +148,20 @@ public class JoJaTeleOp extends OpMode {
         // Feed gate: while a side is still recovering from the last ball, the indexer pauses so the next ball
         // doesn't hit an already-slow wheel (that's what took it down to ~2800)
         // It slows down (FEEDING_SLOW) instead of stopping: restarting from a dead stop browned out the hub.
-        Indexer.State shootFeed = flywheel.readyToFeed() ? Indexer.State.FEEDING : Indexer.State.FEEDING_SLOW;
+        // Spin-up (wheels haven't reached speed yet): indexer waits completely (OFF).
+        // 2026-11-05 proportional feed: once at speed, the indexer + intake slow down in proportion to the
+        // flywheel dip (feed scale 1 = full, 0 = minimum) instead of full / slow. No stop-restart delays, and
+        // they take less battery exactly when the flywheel needs it.
+        Indexer.State shootFeed = flywheel.hasReachedSpeed() ? Indexer.State.FEEDING : Indexer.State.OFF;
+        boolean shootingNow = flywheelOn && stopper.isOpen();
+        double feedScale = flywheel.getFeedScale();
+        indexer.setFeedScale(feedScale);
+        intake.setShootScale(feedScale);
+        // Load shedding: while shooting, drive power drops toward DRIVE_SHOOT_MIN_SCALE as the dip gets worse
+        // (1.0 = off). Spin-up isn't limited (feed scale is 0 then, but nobody is shooting yet).
+        double driveScale = (shootingNow && flywheel.hasReachedSpeed())
+                ? 1.0 - (1.0 - RoboConstants.DRIVE_SHOOT_MIN_SCALE) * (1.0 - feedScale) : 1.0;
+        drivetrain.setPowerScale(driveScale);
 
         // ===== Intake / indexer: only the left trigger runs them (Reverse > Intake > idle) =====
         if (reverseHeld) {
@@ -139,7 +169,6 @@ public class JoJaTeleOp extends OpMode {
             indexer.setState(Indexer.State.REVERSING);
         } else if (intakeHeld) {
             // Left trigger: intake + indexer. Flywheel on + stopper open = shooting feed speed, otherwise intake speed.
-            boolean shootingNow = flywheelOn && stopper.isOpen();
             intake.setState(shootingNow ? Intake.State.SHOOTING : Intake.State.INTAKING);
             indexer.setState(shootingNow ? shootFeed : Indexer.State.INTAKING);
         } else if (flywheelOn) {
@@ -159,13 +188,18 @@ public class JoJaTeleOp extends OpMode {
         indexer.periodic();
         stopper.periodic();
         matchLoader.periodic();
+        amps.update();
 
+        if (!LoopTimer.telemetryNow()) return; // telemetry is slow: only every TELEMETRY_PERIOD_MS
         tele.addData("Flywheel (RT)", spinHeld ? "ON (held)" : flywheelOn
                 ? String.format("ON (stops in %.1f s)", FLYWHEEL_RUN_ON_SECONDS - sinceSpinReleased.seconds()) : "OFF");
         tele.addData("Stopper (R1)", stopper.isOpen() ? "OPEN" : "CLOSED");
         tele.addData("Match loader (L1 up/down, Y mid/up, A mid/down)", matchLoader.getState());
-        tele.addData("Loop", "%.1f ms", loopTimer.milliseconds());
-        loopTimer.reset();
+        tele.addData("Loop ms", "%.1f", loopTimer.getLoopMs());
+        tele.addData("Loop avg ms", "%.1f", loopTimer.getAverageMs());
+        tele.addData("Loop max ms (last 1 s)", "%.1f", loopTimer.getMaxMs());
+        tele.addData("Drive power scale", "%.2f", driveScale);
+        amps.addTelemetry(tele);
         graph();
         panels.update(telemetry);
     }
@@ -193,6 +227,7 @@ public class JoJaTeleOp extends OpMode {
     @Override
 
     public void stop() {
+        LoopTimer.release();
         drivetrain.stop();
         flywheel.stop();
         intake.setState(Intake.State.OFF);

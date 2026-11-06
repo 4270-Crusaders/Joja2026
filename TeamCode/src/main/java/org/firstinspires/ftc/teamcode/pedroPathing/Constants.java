@@ -16,7 +16,8 @@ import org.firstinspires.ftc.teamcode.RoboConstants;
 import org.firstinspires.ftc.teamcode.myLocalizer.MyFollowerBuilder;
 import org.firstinspires.ftc.teamcode.myLocalizer.MyLocalizerConstants;
 
-// Localization: drive-motor encoders + Control Hub IMU (DECODE's MyLocalizer). No odometry pods.
+// Localization (2026-11-05): goBILDA Pinpoint + 2 odometry pods for everything (Pedro Tuning, autos, Loc Tests).
+// The old drive-motor-encoder localizer is still here as createDriveEncoderFollower().
 public class Constants {
     // goBILDA 5203 435 RPM: (1 + 46/17)^2 * 28 = ~384.5 ticks per motor rev
     private static final double DRIVE_TPR = (1 + (46.0 / 17)) * (1 + (46.0 / 17)) * 28;
@@ -24,6 +25,14 @@ public class Constants {
     private static final double WHEEL_DIAMETER_MM = 104;
     private static final double TICKS_TO_INCHES = (WHEEL_DIAMETER_MM * Math.PI / 25.4) / DRIVE_TPR;
 
+    // TUNE with Pedro "Tuning" (Driver Hub TeleOp list), in this order, and paste each result here:
+    //   1. Localization Test (pose should match reality)
+    //   2. Forward / Lateral Velocity Tuner            -> driveConstants .xVelocity(..) / .yVelocity(..)
+    //   3. Forward / Lateral Zero Power Accel Tuner    -> .forwardZeroPowerAcceleration(..) / .lateralZeroPowerAcceleration(..)
+    //      (how fast the robot coasts to a stop: wrong values = it overshoots the end of a path, Loc Test 1)
+    //   4. Translational / Heading / Drive tuners       -> .translationalPIDFCoefficients / .headingPIDFCoefficients /
+    //      .drivePIDFCoefficients (translational = holds the line while strafing, Loc Test 2; heading = turning, Loc Test 3)
+    // Until then Pedro uses its DEFAULT values, which were measured on someone else's robot.
     public static FollowerConstants followerConstants = new FollowerConstants()
             .mass(6.8); // JoJa ~15 lb
 
@@ -80,7 +89,7 @@ public class Constants {
 
     /**
      * Follower that tracks position with the goBILDA Pinpoint + 2 odometry pods (settings in RoboConstants PINPOINT_...).
-     * Used by the JoJa Loc Test autos. Once those check out, createFollower() switches to this too.
+     * Used by everything through createFollower().
      */
     public static Follower createPinpointFollower(HardwareMap hardwareMap) {
         PinpointConstants pinpoint = new PinpointConstants()
@@ -102,7 +111,13 @@ public class Constants {
                 .build();
     }
 
+    /** The follower everything uses: Pinpoint + odometry pods. */
     public static Follower createFollower(HardwareMap hardwareMap, Telemetry tele) {
+        return createPinpointFollower(hardwareMap);
+    }
+
+    /** Old localizer: drive-motor encoders + Control Hub IMU. Not used anymore; kept as a backup. */
+    public static Follower createDriveEncoderFollower(HardwareMap hardwareMap, Telemetry tele) {
         return new MyFollowerBuilder(followerConstants, hardwareMap)
                 .myLocalizer(myLocalizerConstants, tele)
                 .pathConstraints(pathConstraints)

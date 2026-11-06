@@ -7,6 +7,7 @@ import com.qualcomm.robotcore.util.RobotLog;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.RoboConstants;
+import org.firstinspires.ftc.teamcode.utils.LoopTimer;
 
 /**
  * Ball stopper: a single positional servo that blocks balls from reaching the flywheel.
@@ -58,6 +59,7 @@ public class Stopper extends SubsystemBase {
         double target = getTargetPosition();
         stopper.setPosition(target);
 
+        if (!LoopTimer.telemetryNow()) return; // telemetry only every TELEMETRY_PERIOD_MS
         telemetry.addLine("====== Stopper ======");
         telemetry.addData("Stopper/State", state);
         telemetry.addData("Stopper/TargetPos", target);

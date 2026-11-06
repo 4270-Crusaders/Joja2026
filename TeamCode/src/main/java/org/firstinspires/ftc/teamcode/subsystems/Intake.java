@@ -7,6 +7,7 @@ import com.qualcomm.robotcore.util.RobotLog;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.RoboConstants;
+import org.firstinspires.ftc.teamcode.utils.LoopTimer;
 
 /**
  * Intake: single goBILDA 5203 1150 RPM motor, plain open-loop power.
@@ -24,6 +25,7 @@ public class Intake extends SubsystemBase {
     Telemetry telemetry;
     private final DcMotorEx motor;
     private State state = State.OFF;
+    private double shootScale = 1.0; // SHOOTING: 1 = INTAKE_SHOOT_POWER, 0 = INTAKE_SHOOT_MIN_POWER
 
     public Intake(final HardwareMap hMap, final String motorName, Telemetry telemetry) {
         this.telemetry = telemetry;
@@ -36,6 +38,9 @@ public class Intake extends SubsystemBase {
     }
 
     public void setState(State state) { this.state = state; }
+
+    /** Proportional feed (Flywheel.getFeedScale()): backs the intake off while the flywheel recovers. */
+    public void setShootScale(double scale) { shootScale = Math.max(0.0, Math.min(1.0, scale)); }
     public State getState() { return state; }
 
     @Override
@@ -47,7 +52,8 @@ public class Intake extends SubsystemBase {
                 power = RoboConstants.INTAKE_POWER;
                 break;
             case SHOOTING:
-                power = RoboConstants.INTAKE_SHOOT_POWER;
+                power = RoboConstants.INTAKE_SHOOT_MIN_POWER
+                        + (RoboConstants.INTAKE_SHOOT_POWER - RoboConstants.INTAKE_SHOOT_MIN_POWER) * shootScale;
                 break;
             case REVERSING:
                 power = RoboConstants.INTAKE_REVERSE_POWER;
@@ -60,6 +66,7 @@ public class Intake extends SubsystemBase {
 
         motor.setPower(power);
 
+        if (!LoopTimer.telemetryNow()) return; // telemetry only every TELEMETRY_PERIOD_MS
         telemetry.addLine("====== Intake ======");
         telemetry.addData("Intake/State", state);
         telemetry.addData("Intake/Power", "%.2f", power);

@@ -87,7 +87,10 @@ public abstract class JoJaLocTest extends OpMode {
         }
 
         if (move() == Move.ROTATE_180) {
-            follower.turnDegrees(180, true); // true = turn left (counterclockwise)
+            // 2026-11-05: NOT follower.turnDegrees(). It builds its target from getPose(), which right after
+            // setStartingPose() is still the OLD pose (0,0, 0 deg): the robot turned only 90 deg and drove
+            // diagonally toward (0,0). Hold the exact target built from the start pose instead.
+            follower.holdPoint(target);
         } else {
             PathChain path = follower.pathBuilder()
                     .addPath(new BezierLine(start, target))
@@ -106,7 +109,11 @@ public abstract class JoJaLocTest extends OpMode {
         follower.update();
 
         double t = timer.seconds();
-        if (!done && ((!follower.isBusy() && !follower.isTurning() && t > 0.3) || t > TIMEOUT_SECONDS)) {
+        // Rotate: done once within 2 deg of the target heading (holdPoint never reports "busy")
+        boolean arrived = (move() == Move.ROTATE_180)
+                ? Math.abs(headingErrDeg(follower.getPose())) < 2.0
+                : !follower.isBusy() && !follower.isTurning();
+        if (!done && ((arrived && t > 0.3) || t > TIMEOUT_SECONDS)) {
             done = true;
             Pose p = follower.getPose();
             RobotLog.i("[LocTest] %s DONE in %.2f s  end x=%.2f y=%.2f h=%.1f  error x=%.2f y=%.2f h=%.1f%s", move(), t,

@@ -17,6 +17,7 @@ import org.firstinspires.ftc.teamcode.RoboConstants;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.pedroPathing.Drawing;
 import org.firstinspires.ftc.teamcode.subsystems.Flywheel;
+import org.firstinspires.ftc.teamcode.utils.LoopTimer;
 import org.firstinspires.ftc.teamcode.subsystems.Indexer;
 import org.firstinspires.ftc.teamcode.subsystems.Intake;
 import org.firstinspires.ftc.teamcode.subsystems.MatchLoader;
@@ -95,6 +96,7 @@ public abstract class JoJaPedroAuto extends OpMode {
     private boolean stepStarted = false;
     private final ElapsedTime stepTimer = new ElapsedTime();
     private Pose pathEnd; // where the next follow() starts
+    private LoopTimer loopTimer; // 5-10 ms loop, telemetry + field drawing every 50 ms
 
     @Override
     public void init() {
@@ -129,10 +131,12 @@ public abstract class JoJaPedroAuto extends OpMode {
         follower.setStartingPose(s);
         pathEnd = s;
         buildSteps();
+        loopTimer = new LoopTimer();
     }
 
     @Override
     public void loop() {
+        loopTimer.tick();
         for (LynxModule hub : hubs) hub.clearBulkCache();
         follower.update();
 
@@ -158,6 +162,8 @@ public abstract class JoJaPedroAuto extends OpMode {
 
         Pose p = follower.getPose();
         lastPose = p;
+        if (!LoopTimer.telemetryNow()) return;
+        tele.addData("Loop avg / max ms", "%.1f / %.1f", loopTimer.getAverageMs(), loopTimer.getMaxMs());
         tele.addData("Step", stepIndex < steps.size() ? (stepIndex + 1) + " / " + steps.size() : "DONE");
         tele.addData("Pose", "x %.1f  y %.1f  heading %.0f deg", p.getX(), p.getY(), Math.toDegrees(p.getHeading()));
         Drawing.drawDebug(follower);
@@ -166,6 +172,7 @@ public abstract class JoJaPedroAuto extends OpMode {
 
     @Override
     public void stop() {
+        LoopTimer.release();
         follower.breakFollowing();
         flywheel.stop();
         intake.setState(Intake.State.OFF);
@@ -220,7 +227,10 @@ public abstract class JoJaPedroAuto extends OpMode {
                 intake.setState(Intake.State.SHOOTING); // INTAKE_SHOOT_POWER while shooting
             }
             public boolean isDone() {
-                indexer.setState(flywheel.readyToFeed() ? Indexer.State.FEEDING : Indexer.State.FEEDING_SLOW);
+                // Proportional feed, same as JoJa Tele
+                indexer.setState(flywheel.hasReachedSpeed() ? Indexer.State.FEEDING : Indexer.State.OFF);
+                indexer.setFeedScale(flywheel.getFeedScale());
+                intake.setShootScale(flywheel.getFeedScale());
                 if (stepTimer.seconds() < seconds) return false;
                 flywheel.stop();
                 stopper.close();

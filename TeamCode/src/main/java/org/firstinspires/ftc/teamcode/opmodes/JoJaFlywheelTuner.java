@@ -4,12 +4,14 @@ import com.arcrobotics.ftclib.gamepad.GamepadEx;
 import com.arcrobotics.ftclib.gamepad.GamepadKeys;
 import com.bylazar.telemetry.PanelsTelemetry;
 import com.bylazar.telemetry.TelemetryManager;
+import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.RoboConstants;
 import org.firstinspires.ftc.teamcode.subsystems.Flywheel;
+import org.firstinspires.ftc.teamcode.utils.LoopTimer;
 
 /**
  * Flywheel tuning only. Uses the same Flywheel class as JoJa Tele, so what you tune here is what you get.
@@ -28,12 +30,16 @@ public class JoJaFlywheelTuner extends OpMode {
     private Flywheel flywheel;
     private GamepadEx driverOp;
     private boolean on = false;
+    private java.util.List<LynxModule> hubs;
+    private LoopTimer loopTimer; // same 5-10 ms loop as JoJa Tele, so the tuning matches
 
     @Override
     public void init() {
         // Panels: tele goes to Panels AND the Driver Hub on panels.update(telemetry)
         panels = PanelsTelemetry.INSTANCE.getTelemetry();
         tele = PanelsTelemetry.INSTANCE.getFtcTelemetry();
+        hubs = hardwareMap.getAll(LynxModule.class);
+        for (LynxModule hub : hubs) hub.setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL);
 
         flywheel = new Flywheel(hardwareMap, RoboConstants.FLYWHEEL_LEFT_MOTOR_NAME, RoboConstants.FLYWHEEL_RIGHT_MOTOR_NAME, tele);
         driverOp = new GamepadEx(gamepad1);
@@ -43,7 +49,12 @@ public class JoJaFlywheelTuner extends OpMode {
     }
 
     @Override
+    public void start() { loopTimer = new LoopTimer(); }
+
+    @Override
     public void loop() {
+        loopTimer.tick();
+        for (LynxModule hub : hubs) hub.clearBulkCache();
         driverOp.readButtons();
 
         if (driverOp.wasJustPressed(GamepadKeys.Button.A)) on = !on;
@@ -57,21 +68,28 @@ public class JoJaFlywheelTuner extends OpMode {
 
         if (on) flywheel.spinUp(); else flywheel.stop();
         flywheel.periodic(); // runs both PIDFs and adds RPM L/R + Power L/R telemetry
+        if (!LoopTimer.telemetryNow()) return;
+        tele.addData("Loop avg / max ms", "%.1f / %.1f", loopTimer.getAverageMs(), loopTimer.getMaxMs());
 
         tele.addData("Flywheel", on ? "ON" : "OFF (press A)");
         tele.addData("Target RPM", "%.0f", RoboConstants.FLYWHEEL_TARGET_RPM);
         tele.addData("Error L", "%.0f", RoboConstants.FLYWHEEL_TARGET_RPM - flywheel.getLeftRpm());
         tele.addData("Error R", "%.0f", RoboConstants.FLYWHEEL_TARGET_RPM - flywheel.getRightRpm());
         tele.addData("At speed (both)", flywheel.isAtSpeed());
-        tele.addData("Left  kP/kI/kD/kV", "%.5f  %.5f  %.5f  %.6f", RoboConstants.FLYWHEEL_LEFT_kP,
-                RoboConstants.FLYWHEEL_LEFT_kI, RoboConstants.FLYWHEEL_LEFT_kD, RoboConstants.FLYWHEEL_LEFT_kV);
-        tele.addData("Right kP/kI/kD/kV", "%.5f  %.5f  %.5f  %.6f", RoboConstants.FLYWHEEL_RIGHT_kP,
-                RoboConstants.FLYWHEEL_RIGHT_kI, RoboConstants.FLYWHEEL_RIGHT_kD, RoboConstants.FLYWHEEL_RIGHT_kV);
+        tele.addData("Left  kS/kV/kA", "%.4f  %.7f  %.7f", RoboConstants.FLYWHEEL_LEFT_kS,
+                RoboConstants.FLYWHEEL_LEFT_kV, RoboConstants.FLYWHEEL_LEFT_kA);
+        tele.addData("Left  kP/kI/kD", "%.7f  %.7f  %.7f", RoboConstants.FLYWHEEL_LEFT_kP,
+                RoboConstants.FLYWHEEL_LEFT_kI, RoboConstants.FLYWHEEL_LEFT_kD);
+        tele.addData("Right kS/kV/kA", "%.4f  %.7f  %.7f", RoboConstants.FLYWHEEL_RIGHT_kS,
+                RoboConstants.FLYWHEEL_RIGHT_kV, RoboConstants.FLYWHEEL_RIGHT_kA);
+        tele.addData("Right kP/kI/kD", "%.7f  %.7f  %.7f", RoboConstants.FLYWHEEL_RIGHT_kP,
+                RoboConstants.FLYWHEEL_RIGHT_kI, RoboConstants.FLYWHEEL_RIGHT_kD);
         panels.update(telemetry);
     }
 
     @Override
     public void stop() {
+        LoopTimer.release();
         flywheel.stop();
     }
 }

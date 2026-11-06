@@ -9,6 +9,8 @@ import com.qualcomm.robotcore.util.RobotLog;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.RoboConstants;
+import org.firstinspires.ftc.teamcode.utils.CachedPower;
+import org.firstinspires.ftc.teamcode.utils.LoopTimer;
 
 import java.util.Iterator;
 
@@ -26,6 +28,7 @@ public class Drivetrain extends SubsystemBase {
     private final Telemetry telemetry;
     private final DcMotorEx leftFront, leftBack, rightFront, rightBack;
     private final VoltageSensor voltageSensor;
+    private final CachedPower lfOut, lbOut, rfOut, rbOut; // skip writes that barely changed (fast loop)
 
     private State state = State.IDLE;
 
@@ -37,6 +40,7 @@ public class Drivetrain extends SubsystemBase {
     private double moveSeconds = 0.0;
     private double voltageScale = 1.0;
     private double sampledVoltage = 0.0;
+    private double powerScale = 1.0; // TeleOp load shedding while the flywheel recovers (1 = full)
 
 
     public Drivetrain(final HardwareMap hMap,
@@ -63,6 +67,11 @@ public class Drivetrain extends SubsystemBase {
             m.setPower(0.0);
         }
 
+        lfOut = new CachedPower(leftFront);
+        lbOut = new CachedPower(leftBack);
+        rfOut = new CachedPower(rightFront);
+        rbOut = new CachedPower(rightBack);
+
         // Built-in hub voltage sensor (no config name). Null-safe if somehow absent.
         Iterator<VoltageSensor> it = hMap.voltageSensor.iterator();
         voltageSensor = it.hasNext() ? it.next() : null;
@@ -79,6 +88,9 @@ public class Drivetrain extends SubsystemBase {
         this.turn = turn;
         state = State.MANUAL;
     }
+
+    /** Scales all drive power (1 = normal). Used to give the flywheel more battery while it recovers. */
+    public void setPowerScale(double scale) { powerScale = Math.max(0.0, Math.min(1.0, scale)); }
 
     /** Auto: hold the commanded powers for {@code seconds}, then IDLE. any -> TIMED_MOVE. */
     public void timedMove(double fwd, double strafe, double turn, double seconds) {
@@ -127,7 +139,7 @@ public class Drivetrain extends SubsystemBase {
         double f = 0.0, s = 0.0, t = 0.0;
         switch (state) {
             case MANUAL:
-                f = fwd; s = strafe; t = turn;
+                f = fwd * powerScale; s = strafe * powerScale; t = turn * powerScale;
                 break;
             case TIMED_MOVE:
                 f = fwd * voltageScale; s = strafe * voltageScale; t = turn * voltageScale;
@@ -151,11 +163,12 @@ public class Drivetrain extends SubsystemBase {
         double rfPwr = rf / max;
         double rbPwr = rb / max;
 
-        leftFront.setPower(lfPwr);
-        leftBack.setPower(lbPwr);
-        rightFront.setPower(rfPwr);
-        rightBack.setPower(rbPwr);
+        lfOut.set(lfPwr);
+        lbOut.set(lbPwr);
+        rfOut.set(rfPwr);
+        rbOut.set(rbPwr);
 
+        if (!LoopTimer.telemetryNow()) return; // telemetry only every TELEMETRY_PERIOD_MS
         telemetry.addLine("====== Drivetrain ======");
         telemetry.addData("Drivetrain/State", state);
         telemetry.addData("Drivetrain/Input", "f=%.2f s=%.2f t=%.2f", fwd, strafe, turn);
