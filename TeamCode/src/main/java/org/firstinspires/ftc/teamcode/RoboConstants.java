@@ -171,7 +171,11 @@ public final class RoboConstants {
     // Control Hub I2C bus 1. Driver Hub config: "goBILDA Pinpoint Odometry Computer" named "pinpoint"
     public static final String PINPOINT_NAME = "pinpoint";
     public static boolean PINPOINT_4_BAR_POD = true;  // true = 4-Bar Odometry Pod, false = Swingarm Pod. VERIFY
-    // Offsets from the robot center, inches (JoJa Odometry Offset Cal, 2026-11-05):
+    // ONE place for the Pinpoint settings: Pedro (pedro/Constants), JoJa Tele and JoJa Odometry Test all read these.
+    // Tune with Pedro AutoTune > Pinpoint Procedure (see pedro/Tuning.java), then copy its Java tab values HERE:
+    //   xPodOffset -> PINPOINT_X_OFFSET_IN, yPodOffset -> PINPOINT_Y_OFFSET_IN,
+    //   xPodDirection / yPodDirection REVERSED -> PINPOINT_X_REVERSED / PINPOINT_Y_REVERSED = true, podType -> PINPOINT_4_BAR_POD
+    // Offsets from the robot center, inches (last measured 2026-11-05):
     // X offset = how far LEFT (+) / right (-) the FORWARD pod (X port) is. Y offset = how far FORWARD (+) / back (-) the STRAFE pod (Y port) is.
     public static double PINPOINT_X_OFFSET_IN = 1.44;
     // 2026-11-05: was +4.29, measured while the Y pod was still backwards (Y_REVERSED false). Flipping the pod

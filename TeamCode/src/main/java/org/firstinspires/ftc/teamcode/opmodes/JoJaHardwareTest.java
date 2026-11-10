@@ -181,7 +181,7 @@ public class JoJaHardwareTest extends OpMode {
             flywheel = new Flywheel(hardwareMap, RoboConstants.FLYWHEEL_LEFT_MOTOR_NAME, RoboConstants.FLYWHEEL_RIGHT_MOTOR_NAME, tele);
         }
 
-        // Same orientation as pedroPathing/Constants: keep the two in sync
+        // Control Hub IMU mounting (Pedro 3 uses the Pinpoint for heading, so only this test uses it)
         imu = hardwareMap.get(IMU.class, "imu");
         imu.initialize(new IMU.Parameters(new RevHubOrientationOnRobot(
                 RevHubOrientationOnRobot.LogoFacingDirection.LEFT,

@@ -3,29 +3,27 @@ package org.firstinspires.ftc.teamcode.opmodes;
 import com.bylazar.configurables.annotations.Configurable;
 import com.bylazar.telemetry.PanelsTelemetry;
 import com.bylazar.telemetry.TelemetryManager;
+import com.pedropathing.api.Paths;
 import com.pedropathing.follower.Follower;
-import com.pedropathing.geometry.BezierLine;
-import com.pedropathing.geometry.Pose;
-import com.pedropathing.paths.PathChain;
+import com.pedropathing.math.Pose;
 import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.RobotLog;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
-import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
-import org.firstinspires.ftc.teamcode.pedroPathing.Drawing;
+import org.firstinspires.ftc.teamcode.pedro.Constants;
 
 import java.util.List;
 
 /**
- * Localization test with the Pinpoint + odometry pods. Field: (0,0) = bottom-left corner, inches,
+ * Localization test with the Pinpoint + odometry pods (Pedro Pathing 3). Field: (0,0) = bottom-left corner, inches,
  * heading 0 = facing +X, counterclockwise +.
  *
  * Place the robot at START_X / START_Y / START_HEADING_DEG (edit here or live in Panels), then Play.
- * The robot does one move, then holds still. Screen + Panels field show where it thinks it is.
- * Measure where it REALLY ended with a tape measure and compare to "Pose now".
- * Also logged to logcat every 0.1 s, tag "[LocTest]".
+ * The robot does one move, then holds still. Measure where it REALLY ended with a tape measure and
+ * compare to "Pose now". Also logged to logcat every 0.1 s, tag "[LocTest]".
+ * Until the Foresight Procedure is tuned, Pedro uses placeholder path gains (pedro/Constants).
  */
 @Configurable
 public abstract class JoJaLocTest extends OpMode {
@@ -53,8 +51,7 @@ public abstract class JoJaLocTest extends OpMode {
         tele = PanelsTelemetry.INSTANCE.getFtcTelemetry();
         hubs = hardwareMap.getAll(LynxModule.class);
         for (LynxModule hub : hubs) hub.setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL);
-        follower = Constants.createPinpointFollower(hardwareMap);
-        Drawing.init();
+        follower = Constants.create(hardwareMap);
     }
 
     @Override
@@ -71,7 +68,7 @@ public abstract class JoJaLocTest extends OpMode {
     public void start() {
         double h = Math.toRadians(START_HEADING_DEG);
         start = new Pose(START_X, START_Y, h);
-        follower.setStartingPose(start);
+        follower.setPose(start);
 
         switch (move()) {
             case FORWARD:       // along the way the robot faces
@@ -87,20 +84,13 @@ public abstract class JoJaLocTest extends OpMode {
         }
 
         if (move() == Move.ROTATE_180) {
-            // 2026-11-05: NOT follower.turnDegrees(). It builds its target from getPose(), which right after
-            // setStartingPose() is still the OLD pose (0,0, 0 deg): the robot turned only 90 deg and drove
-            // diagonally toward (0,0). Hold the exact target built from the start pose instead.
-            follower.holdPoint(target);
+            follower.hold(target); // turn in place by holding the target pose
         } else {
-            PathChain path = follower.pathBuilder()
-                    .addPath(new BezierLine(start, target))
-                    .setConstantHeadingInterpolation(h)
-                    .build();
-            follower.followPath(path, true); // hold the end point
+            follower.follow(Paths.line(start, target).constant(h)); // straight line, heading stays the same
         }
         timer.reset();
         RobotLog.i("[LocTest] %s start x=%.2f y=%.2f h=%.1f  target x=%.2f y=%.2f h=%.1f", move(),
-                start.getX(), start.getY(), START_HEADING_DEG, target.getX(), target.getY(), Math.toDegrees(target.getHeading()));
+                start.x(), start.y(), START_HEADING_DEG, target.x(), target.y(), Math.toDegrees(target.heading()));
     }
 
     @Override
@@ -109,40 +99,39 @@ public abstract class JoJaLocTest extends OpMode {
         follower.update();
 
         double t = timer.seconds();
-        // Rotate: done once within 2 deg of the target heading (holdPoint never reports "busy")
+        Pose p = follower.pose();
+        // Rotate: done once within 2 deg of the target heading (holding never reports "busy")
         boolean arrived = (move() == Move.ROTATE_180)
-                ? Math.abs(headingErrDeg(follower.getPose())) < 2.0
-                : !follower.isBusy() && !follower.isTurning();
+                ? Math.abs(headingErrDeg(p)) < 2.0
+                : !follower.isBusy() || follower.atParametricEnd(); // same end check as Pedro's Line Test
         if (!done && ((arrived && t > 0.3) || t > TIMEOUT_SECONDS)) {
             done = true;
-            Pose p = follower.getPose();
+            if (move() != Move.ROTATE_180) follower.hold(target); // keep holding the end point
             RobotLog.i("[LocTest] %s DONE in %.2f s  end x=%.2f y=%.2f h=%.1f  error x=%.2f y=%.2f h=%.1f%s", move(), t,
-                    p.getX(), p.getY(), Math.toDegrees(p.getHeading()),
-                    p.getX() - target.getX(), p.getY() - target.getY(), headingErrDeg(p), t > TIMEOUT_SECONDS ? " (TIMEOUT)" : "");
+                    p.x(), p.y(), Math.toDegrees(p.heading()),
+                    p.x() - target.x(), p.y() - target.y(), headingErrDeg(p), t > TIMEOUT_SECONDS ? " (TIMEOUT)" : "");
         }
 
-        Pose p = follower.getPose();
         if (t - lastLog >= 0.1) {
             lastLog = t;
-            RobotLog.i("[LocTest] t=%.2f x=%.2f y=%.2f h=%.1f", t, p.getX(), p.getY(), Math.toDegrees(p.getHeading()));
+            RobotLog.i("[LocTest] t=%.2f x=%.2f y=%.2f h=%.1f", t, p.x(), p.y(), Math.toDegrees(p.heading()));
         }
 
         tele.addData("Test", "%s   %s", move(), done ? "DONE (holding)" : String.format("moving %.1f s", t));
-        tele.addData("Start ", "x %.2f  y %.2f  heading %.1f", start.getX(), start.getY(), START_HEADING_DEG);
-        tele.addData("Target", "x %.2f  y %.2f  heading %.1f", target.getX(), target.getY(), norm(Math.toDegrees(target.getHeading())));
-        tele.addData("Pose now", "x %.2f  y %.2f  heading %.1f", p.getX(), p.getY(), norm(Math.toDegrees(p.getHeading())));
-        tele.addData("Error (now - target)", "x %.2f  y %.2f  heading %.1f", p.getX() - target.getX(), p.getY() - target.getY(), headingErrDeg(p));
-        tele.addData("Moved", "%.2f in", Math.hypot(p.getX() - start.getX(), p.getY() - start.getY()));
-        panels.addData("Graph/X", Math.round(p.getX() * 100) / 100.0);
-        panels.addData("Graph/Y", Math.round(p.getY() * 100) / 100.0);
-        panels.addData("Graph/Heading", Math.round(norm(Math.toDegrees(p.getHeading())) * 10) / 10.0);
-        Drawing.drawDebug(follower);
+        tele.addData("Start ", "x %.2f  y %.2f  heading %.1f", start.x(), start.y(), START_HEADING_DEG);
+        tele.addData("Target", "x %.2f  y %.2f  heading %.1f", target.x(), target.y(), norm(Math.toDegrees(target.heading())));
+        tele.addData("Pose now", "x %.2f  y %.2f  heading %.1f", p.x(), p.y(), norm(Math.toDegrees(p.heading())));
+        tele.addData("Error (now - target)", "x %.2f  y %.2f  heading %.1f", p.x() - target.x(), p.y() - target.y(), headingErrDeg(p));
+        tele.addData("Moved", "%.2f in", Math.hypot(p.x() - start.x(), p.y() - start.y()));
+        panels.addData("Graph/X", Math.round(p.x() * 100) / 100.0);
+        panels.addData("Graph/Y", Math.round(p.y() * 100) / 100.0);
+        panels.addData("Graph/Heading", Math.round(norm(Math.toDegrees(p.heading())) * 10) / 10.0);
         panels.update(telemetry);
     }
 
     @Override
     public void stop() {
-        follower.breakFollowing();
+        follower.stop();
     }
 
     /** Degrees in 0..360. */
@@ -150,7 +139,7 @@ public abstract class JoJaLocTest extends OpMode {
 
     /** Heading error in -180..180 degrees. */
     private double headingErrDeg(Pose p) {
-        double e = Math.toDegrees(p.getHeading() - target.getHeading());
+        double e = Math.toDegrees(p.heading() - target.heading());
         return ((e + 540) % 360) - 180;
     }
 }

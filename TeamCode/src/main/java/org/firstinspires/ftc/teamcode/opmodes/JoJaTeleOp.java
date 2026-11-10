@@ -71,11 +71,7 @@ public class JoJaTeleOp extends OpMode {
         matchLoader = new MatchLoader(hardwareMap, RoboConstants.MATCH_LOADER_SERVO_NAME, tele);
         autoShoot = new AutoShoot(flywheel, stopper, tele);
         odometry = new Odometry(hardwareMap, tele);
-        // Carry over where the auto ended (Pedro field). No auto run? Press X at the bottom-left corner.
-        if (JoJaPedroAuto.lastPose != null) {
-            odometry.setPose(JoJaPedroAuto.lastPose.getX(), JoJaPedroAuto.lastPose.getY(),
-                    Math.toDegrees(JoJaPedroAuto.lastPose.getHeading()));
-        }
+        // No auto to carry the position over from (autos removed 2026-11-09): press A at the bottom-left corner for (0,0).
 
         // util
         driverOp = new GamepadEx(gamepad1);

@@ -252,8 +252,8 @@ The Pedro-based autos (Near, Far, Forward + Right test, and `JoJaAutoBase`) were
 | FTC SDK (official base) | 12.0.0 | — |
 | FTCLib core (`org.ftclib.ftclib:core`) | 2.1.1 | `SubsystemBase`, `GamepadEx` |
 | Panels (`com.bylazar:fullpanels`, repo `https://mymaven.bylazar.com/releases`) | 1.0.9 | Live tuning / telemetry |
-| Pedro Pathing (`com.pedropathing:ftc`) | 2.0.4 | Auto path following (same version as DECODE; the ported localizer and Tuning code targets it. 2.1.2 exists but is untested here) |
-| Pedro telemetry (`com.pedropathing:telemetry`) | 1.0.0 | Tuning OpModes |
+| Pedro Pathing (`com.pedropathing:revhub`) | 3.0.2 | Path following + localization (upgraded from 2.0.4 on 2026-11-10; code in `pedro/`, tuners copied from the official Quickstart) |
+| Pedro AutoTune (`com.pedropathing:tuning`) | 1.0.3 | Tuning web page at http://192.168.43.1:10158 |
 
 - **Dropped from the reference:** FTCLib vision.
 - **Risk to verify on first build:** FTCLib 2.1.1, Panels 1.0.9 and Pedro 2.0.4 were used with SDK 11.0 in DECODE; SDK 12.0 compatibility hasn't been confirmed yet.
