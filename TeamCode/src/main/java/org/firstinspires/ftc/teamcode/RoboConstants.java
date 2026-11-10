@@ -77,7 +77,7 @@ public final class RoboConstants {
     public static final DcMotorSimple.Direction FLYWHEEL_RIGHT_DIRECTION = DcMotorSimple.Direction.FORWARD;
     public static final int FLYWHEEL_TPR = 28;            // bare motor encoder, ticks per motor rev
     public static double FLYWHEEL_GEAR_RATIO    = 1.0;    // motor revs per wheel rev. JoJa: 1:1
-    public static double FLYWHEEL_TARGET_RPM    = 3150; // wheel RPM (set by team 2026-10-24)
+    public static double FLYWHEEL_TARGET_RPM    = 3250; // wheel RPM (set by team 2026-10-24)
     // Panels graph zoom (JoJa Tele graph()): the y-axis shows TARGET +/- this many RPM. Anything outside is drawn
     // flat on the edge. Bigger = see more, smaller = see small wiggles. Live-tunable in Panels.
     public static double GRAPH_RPM_WINDOW = 75.0; // 2026-11-04: was 150, zoomed in more
@@ -95,6 +95,17 @@ public final class RoboConstants {
     // Shot recovery (only while the stopper is open): full power whenever a side is more than this below target.
     // Small = fights every dip right away. If it overshoots above target while shooting, raise it a little.
     public static double FLYWHEEL_RECOVERY_BAND_RPM = 30.0;
+    // ===== Auto shoot (JoJa Tele, 2026-11-09, subsystems/AutoShoot) =====
+    // Hold RT: once BOTH sides are within READY_RPM of target for READY_S, the stopper opens by itself.
+    // Each ball shows up as a dip of more than HIT_RPM. The stopper closes by itself once no new dip for EMPTY_S
+    // (balls gone), or no ball at all within NO_BALL_S, or after MAX_S. Once per RT press. R1 still works (cancels auto).
+    public static boolean AUTO_SHOOT_ENABLED  = true;
+    public static double AUTO_SHOOT_READY_RPM = 50.0;  // opens too late / never? raise it. First shot weak? lower it.
+    public static double AUTO_SHOOT_READY_S   = 0.15;  // must stay at speed this long (not just touch the target)
+    public static double AUTO_SHOOT_HIT_RPM   = 60.0;  // dip size that counts as a ball. Missed balls? lower it.
+    public static double AUTO_SHOOT_EMPTY_S   = 0.6;   // closes too early mid-volley? raise it. Stays open too long? lower it.
+    public static double AUTO_SHOOT_NO_BALL_S = 1.0;
+    public static double AUTO_SHOOT_MAX_S     = 4.0;
     // MASTER SWITCH (2026-11-05): false = NO feed gate. Indexer + intake feed at full speed the whole time the stopper
     // is open, no waiting for spin-up, no slowing during dips (like before the gate existed). Fastest balls/sec.
     // true = everything below (spin-up wait + proportional feed). Live-tunable in Panels.
@@ -147,9 +158,9 @@ public final class RoboConstants {
     // ===== Match Loader =====
     // Expansion Hub servo port 0, goBILDA positional servo
     public static final String MATCH_LOADER_SERVO_NAME = "matchLoader";
-    public static double MATCH_LOADER_DOWN_POS = 0.3; // deployed down (set by team 2026-10-24)
-    public static double MATCH_LOADER_UP_POS   = 0.66; // closed / up (set by team 2026-10-24)
-    public static double MATCH_LOADER_MIDDLE_POS = 0.465; // pollen-only gap, no nectar. GUESS (halfway): TUNE on the robot
+    public static double MATCH_LOADER_DOWN_POS = 0.42; // deployed down (JoJa Match Loader Test, 2026-11-09)
+    public static double MATCH_LOADER_UP_POS   = 0.742; // closed / up (JoJa Match Loader Test, 2026-11-09)
+    public static double MATCH_LOADER_MIDDLE_POS = 0.524; // pollen-only gap, no nectar (JoJa Match Loader Test, 2026-11-09)
     // Trim added to ALL three positions (fixes a servo horn screwed on at the wrong angle).
     // Adjust live in JoJa Tele with the D-pad, then copy the value shown on the Driver Hub here.
     public static double MATCH_LOADER_OFFSET = 0.0;

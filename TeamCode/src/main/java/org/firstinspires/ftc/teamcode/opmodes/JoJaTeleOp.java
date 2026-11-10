@@ -11,11 +11,13 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.RoboConstants;
+import org.firstinspires.ftc.teamcode.subsystems.AutoShoot;
 import org.firstinspires.ftc.teamcode.subsystems.Drivetrain;
 import org.firstinspires.ftc.teamcode.subsystems.Flywheel;
 import org.firstinspires.ftc.teamcode.subsystems.Indexer;
 import org.firstinspires.ftc.teamcode.subsystems.Intake;
 import org.firstinspires.ftc.teamcode.subsystems.MatchLoader;
+import org.firstinspires.ftc.teamcode.subsystems.Odometry;
 import org.firstinspires.ftc.teamcode.subsystems.Stopper;
 import org.firstinspires.ftc.teamcode.utils.CurrentMonitor;
 import org.firstinspires.ftc.teamcode.utils.LoopTimer;
@@ -33,6 +35,8 @@ public class JoJaTeleOp extends OpMode {
     private Stopper stopper;
     private Flywheel flywheel;
     private MatchLoader matchLoader;
+    private AutoShoot autoShoot;   // opens / closes the stopper by itself (RoboConstants.AUTO_SHOOT_...)
+    private Odometry odometry;     // Pinpoint position on the Pedro field (X button = (0,0))
 
     // ===== Utils =====
     private GamepadEx driverOp;
@@ -64,6 +68,13 @@ public class JoJaTeleOp extends OpMode {
         stopper = new Stopper(hardwareMap, RoboConstants.STOPPER_SERVO_NAME, tele);
         flywheel = new Flywheel(hardwareMap, RoboConstants.FLYWHEEL_LEFT_MOTOR_NAME, RoboConstants.FLYWHEEL_RIGHT_MOTOR_NAME, tele);
         matchLoader = new MatchLoader(hardwareMap, RoboConstants.MATCH_LOADER_SERVO_NAME, tele);
+        autoShoot = new AutoShoot(flywheel, stopper, tele);
+        odometry = new Odometry(hardwareMap, tele);
+        // Carry over where the auto ended (Pedro field). No auto run? Press X at the bottom-left corner.
+        if (JoJaPedroAuto.lastPose != null) {
+            odometry.setPose(JoJaPedroAuto.lastPose.getX(), JoJaPedroAuto.lastPose.getY(),
+                    Math.toDegrees(JoJaPedroAuto.lastPose.getHeading()));
+        }
 
         // util
         driverOp = new GamepadEx(gamepad1);
@@ -110,15 +121,15 @@ public class JoJaTeleOp extends OpMode {
         if (driverOp.wasJustPressed(GamepadKeys.Button.LEFT_BUMPER)) { // L1: match loader up/down
             matchLoader.toggle();
         }
-        if (driverOp.wasJustPressed(GamepadKeys.Button.Y)) {   // Y: MIDDLE <-> UP
-            if (matchLoader.isMiddle()) matchLoader.up(); else matchLoader.middle();
-        }
-        if (driverOp.wasJustPressed(GamepadKeys.Button.A)) {   // A: MIDDLE <-> DOWN
-            if (matchLoader.isMiddle()) matchLoader.down(); else matchLoader.middle();
-        }
+        // 2026-11-09: Y / A no longer move the match loader to MIDDLE (MatchLoader.middle() etc. still exist).
+        // Y and X: nothing.
 
-        // Outtake (reverse intake + indexer): hold B or X
-        boolean reverseHeld = driverOp.getButton(GamepadKeys.Button.B) || driverOp.getButton(GamepadKeys.Button.X);
+        // ===== Odometry: A = this spot is (0,0) (heading kept) =====
+        odometry.update();
+        if (driverOp.wasJustPressed(GamepadKeys.Button.A)) odometry.setXY(0.0, 0.0);
+
+        // Outtake (reverse intake + indexer): hold B
+        boolean reverseHeld = driverOp.getButton(GamepadKeys.Button.B);
         boolean spinHeld = driverOp.getTrigger(GamepadKeys.Trigger.RIGHT_TRIGGER) > TRIGGER_THRESHOLD;
         boolean intakeHeld = driverOp.getTrigger(GamepadKeys.Trigger.LEFT_TRIGGER) > TRIGGER_THRESHOLD;
 
@@ -137,7 +148,12 @@ public class JoJaTeleOp extends OpMode {
         }
         if (driverOp.wasJustPressed(GamepadKeys.Button.RIGHT_BUMPER)) {
             if (stopper.isOpen()) stopper.close(); else stopper.open();
+            autoShoot.cancel(); // driver took over: no auto open / close until RT is released
         }
+        // Auto shoot: RT held + both sides at target RPM -> stopper opens; balls gone -> stopper closes
+        autoShoot.update(spinHeld);
+        // 2026-11-09: RT not held -> stopper always closed (also after opening it by hand with R1)
+        if (!spinHeld) stopper.close();
         // Intaking closes the stopper automatically (on left-trigger press) so balls collect and hold.
         // Not while the flywheel is on: then the left trigger is how you feed balls into the shooter.
         if (intakeHeld && !intakeWasHeld && !flywheelOn) stopper.close();
@@ -194,7 +210,9 @@ public class JoJaTeleOp extends OpMode {
         tele.addData("Flywheel (RT)", spinHeld ? "ON (held)" : flywheelOn
                 ? String.format("ON (stops in %.1f s)", FLYWHEEL_RUN_ON_SECONDS - sinceSpinReleased.seconds()) : "OFF");
         tele.addData("Stopper (R1)", stopper.isOpen() ? "OPEN" : "CLOSED");
-        tele.addData("Match loader (L1 up/down, Y mid/up, A mid/down)", matchLoader.getState());
+        autoShoot.addTelemetry();
+        odometry.addTelemetry();
+        tele.addData("Match loader (L1 up/down)", matchLoader.getState());
         tele.addData("Loop ms", "%.1f", loopTimer.getLoopMs());
         tele.addData("Loop avg ms", "%.1f", loopTimer.getAverageMs());
         tele.addData("Loop max ms (last 1 s)", "%.1f", loopTimer.getMaxMs());
