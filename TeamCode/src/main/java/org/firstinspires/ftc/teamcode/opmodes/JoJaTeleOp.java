@@ -19,6 +19,7 @@ import org.firstinspires.ftc.teamcode.subsystems.Intake;
 import org.firstinspires.ftc.teamcode.subsystems.MatchLoader;
 import org.firstinspires.ftc.teamcode.subsystems.Odometry;
 import org.firstinspires.ftc.teamcode.subsystems.Stopper;
+import org.firstinspires.ftc.teamcode.utils.Battery;
 import org.firstinspires.ftc.teamcode.utils.CurrentMonitor;
 import org.firstinspires.ftc.teamcode.utils.LoopTimer;
 
@@ -207,6 +208,7 @@ public class JoJaTeleOp extends OpMode {
         amps.update();
 
         if (!LoopTimer.telemetryNow()) return; // telemetry is slow: only every TELEMETRY_PERIOD_MS
+        tele.addData("Battery", Battery.isLow() ? "%.2f V  LOW: swap battery soon" : "%.2f V", Battery.volts());
         tele.addData("Flywheel (RT)", spinHeld ? "ON (held)" : flywheelOn
                 ? String.format("ON (stops in %.1f s)", FLYWHEEL_RUN_ON_SECONDS - sinceSpinReleased.seconds()) : "OFF");
         tele.addData("Stopper (R1)", stopper.isOpen() ? "OPEN" : "CLOSED");

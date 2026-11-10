@@ -3,12 +3,12 @@ package org.firstinspires.ftc.teamcode.subsystems;
 import com.arcrobotics.ftclib.command.SubsystemBase;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
-import com.qualcomm.robotcore.hardware.VoltageSensor;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.RobotLog;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.RoboConstants;
+import org.firstinspires.ftc.teamcode.utils.Battery;
 import org.firstinspires.ftc.teamcode.utils.CachedPower;
 import org.firstinspires.ftc.teamcode.utils.LoopTimer;
 
@@ -29,7 +29,6 @@ public class Indexer extends SubsystemBase {
     Telemetry telemetry;
     private final DcMotorEx motor;
     private final CachedPower out;
-    private final VoltageSensor voltageSensor;
     private State state = State.OFF;
     private double appliedPower = 0.0;              // ramped power actually sent to the motor
     private double feedScale = 1.0;                 // FEEDING: 1 = full feed power, 0 = INDEXER_FEED_SLOW_POWER
@@ -43,8 +42,7 @@ public class Indexer extends SubsystemBase {
         motor.setMode(DcMotorEx.RunMode.RUN_WITHOUT_ENCODER);
         motor.setPower(0.0);
         out = new CachedPower(motor);
-        java.util.Iterator<VoltageSensor> it = hMap.voltageSensor.iterator();
-        voltageSensor = it.hasNext() ? it.next() : null;
+        Battery.init(hMap); // shared battery reading (voltage compensation)
         RobotLog.i("[Indexer] Initialized.");
     }
 
@@ -53,13 +51,6 @@ public class Indexer extends SubsystemBase {
     /** Proportional feed (Flywheel.getFeedScale()): FEEDING power goes from FEED_SLOW (0) to FEED (1). */
     public void setFeedScale(double scale) { feedScale = Math.max(0.0, Math.min(1.0, scale)); }
     public State getState() { return state; }
-
-//    /** Power that puts about INDEXER_FEED_VOLTS on the motor at the current battery voltage. */
-//    private double feedPower() {
-//        double battery = (voltageSensor != null) ? voltageSensor.getVoltage() : 12.0;
-//        if (battery < 1.0) battery = 12.0;
-//        return Math.max(0.0, Math.min(1.0, RoboConstants.INDEXER_FEED_VOLTS / battery));
-//    }
 
     private double powerFor(State s) {
         switch (s) {
@@ -76,7 +67,8 @@ public class Indexer extends SubsystemBase {
     @Override
     public void periodic() {
         // Read constants every loop so Panels edits take effect live.
-        double target = powerFor(state);
+        // Voltage compensation: same speed at any battery level (2026-11-09). 1.0 stays 1.0.
+        double target = Battery.comp(powerFor(state));
         double dt = Math.min(rampTimer.seconds(), 0.1); // cap: a long gap between loops shouldn't skip the ramp
         rampTimer.reset();
 

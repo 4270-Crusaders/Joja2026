@@ -38,6 +38,10 @@ public class Constants {
 
     public static MecanumConstants driveConstants = new MecanumConstants()
             .maxPower(1)
+            // 2026-11-09: Pedro's built-in voltage compensation, so paths drive the same as the battery drains.
+            // Turned on BEFORE running the Pedro tuners, so the tuned numbers already include it.
+            .useVoltageCompensation(true)
+            .nominalVoltage(RoboConstants.BATTERY_NOMINAL_VOLTAGE)
             .rightFrontMotorName(RoboConstants.DRIVE_RIGHT_FRONT_NAME)
             .rightRearMotorName(RoboConstants.DRIVE_RIGHT_BACK_NAME)
             .leftFrontMotorName(RoboConstants.DRIVE_LEFT_FRONT_NAME)

@@ -7,6 +7,7 @@ import com.qualcomm.robotcore.util.RobotLog;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.RoboConstants;
+import org.firstinspires.ftc.teamcode.utils.Battery;
 import org.firstinspires.ftc.teamcode.utils.LoopTimer;
 
 /**
@@ -34,6 +35,7 @@ public class Intake extends SubsystemBase {
         motor.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.FLOAT);
         motor.setMode(DcMotorEx.RunMode.RUN_WITHOUT_ENCODER);
         motor.setPower(0.0);
+        Battery.init(hMap); // shared battery reading (voltage compensation)
         RobotLog.i("[Intake] Initialized.");
     }
 
@@ -64,6 +66,7 @@ public class Intake extends SubsystemBase {
                 break;
         }
 
+        power = Battery.comp(power); // voltage compensation: same speed at any battery level (2026-11-09)
         motor.setPower(power);
 
         if (!LoopTimer.telemetryNow()) return; // telemetry only every TELEMETRY_PERIOD_MS

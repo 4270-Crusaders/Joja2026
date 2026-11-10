@@ -3,16 +3,15 @@ package org.firstinspires.ftc.teamcode.subsystems;
 import com.arcrobotics.ftclib.command.SubsystemBase;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
-import com.qualcomm.robotcore.hardware.VoltageSensor;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.RobotLog;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.RoboConstants;
+import org.firstinspires.ftc.teamcode.utils.Battery;
 import org.firstinspires.ftc.teamcode.utils.CachedPower;
 import org.firstinspires.ftc.teamcode.utils.LoopTimer;
 
-import java.util.Iterator;
 
 /**
  * Robot-centric mecanum drivetrain, full speed, no slow mode.
@@ -27,7 +26,6 @@ public class Drivetrain extends SubsystemBase {
 
     private final Telemetry telemetry;
     private final DcMotorEx leftFront, leftBack, rightFront, rightBack;
-    private final VoltageSensor voltageSensor;
     private final CachedPower lfOut, lbOut, rfOut, rbOut; // skip writes that barely changed (fast loop)
 
     private State state = State.IDLE;
@@ -72,9 +70,7 @@ public class Drivetrain extends SubsystemBase {
         rfOut = new CachedPower(rightFront);
         rbOut = new CachedPower(rightBack);
 
-        // Built-in hub voltage sensor (no config name). Null-safe if somehow absent.
-        Iterator<VoltageSensor> it = hMap.voltageSensor.iterator();
-        voltageSensor = it.hasNext() ? it.next() : null;
+        Battery.init(hMap); // shared battery reading (voltage compensation)
 
         RobotLog.i("[Drivetrain] Initialized.");
     }
@@ -98,13 +94,6 @@ public class Drivetrain extends SubsystemBase {
         this.strafe = strafe;
         this.turn = turn;
         this.moveSeconds = seconds;
-
-        // Sample battery voltage once at the start of the move.
-        voltageScale = 1.0;
-        sampledVoltage = (voltageSensor != null) ? voltageSensor.getVoltage() : 0.0;
-        if (RoboConstants.DRIVE_VOLTAGE_COMP_ENABLED && sampledVoltage > 0.0) {
-            voltageScale = RoboConstants.DRIVE_NOMINAL_VOLTAGE / sampledVoltage;
-        }
 
         moveTimer.reset();
         state = State.TIMED_MOVE;
@@ -136,10 +125,17 @@ public class Drivetrain extends SubsystemBase {
             stop();
         }
 
+        // Voltage compensation (TeleOp AND timed moves, every loop): same stick = same speed at any battery level.
+        // Full stick is already 1.0 and can't go higher; it's the partial-stick speeds that stay the same.
+        sampledVoltage = Battery.volts();
+        voltageScale = RoboConstants.DRIVE_VOLTAGE_COMP_ENABLED && RoboConstants.BATTERY_COMP_ENABLED
+                ? RoboConstants.DRIVE_NOMINAL_VOLTAGE / sampledVoltage : 1.0;
+
         double f = 0.0, s = 0.0, t = 0.0;
         switch (state) {
             case MANUAL:
-                f = fwd * powerScale; s = strafe * powerScale; t = turn * powerScale;
+                double k = powerScale * voltageScale;
+                f = fwd * k; s = strafe * k; t = turn * k;
                 break;
             case TIMED_MOVE:
                 f = fwd * voltageScale; s = strafe * voltageScale; t = turn * voltageScale;

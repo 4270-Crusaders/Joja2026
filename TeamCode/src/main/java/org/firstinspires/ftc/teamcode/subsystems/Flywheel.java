@@ -3,14 +3,13 @@ package org.firstinspires.ftc.teamcode.subsystems;
 import com.arcrobotics.ftclib.command.SubsystemBase;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
-import com.qualcomm.robotcore.hardware.VoltageSensor;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.RobotLog;
 
-import java.util.Iterator;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.RoboConstants;
+import org.firstinspires.ftc.teamcode.utils.Battery;
 import org.firstinspires.ftc.teamcode.utils.CachedPower;
 import org.firstinspires.ftc.teamcode.utils.LoopTimer;
 
@@ -33,7 +32,7 @@ import org.firstinspires.ftc.teamcode.utils.LoopTimer;
  *   4. Battery compensation: power * (12 V / battery), clamped 0..1 (never brakes the wheel)
  *
  * Built for a 5-10 ms loop (utils/LoopTimer): speed comes from the bulk cache (no extra hub reads), the battery
- * is read only every BATTERY_PERIOD_S (each read is a separate, slow hub command), motor writes are skipped when
+ * is read only every 0.1 s (utils/Battery; each read is a separate, slow hub command), motor writes are skipped when
  * the power barely changed, and telemetry is only built on telemetry loops. All filters are in seconds, so they
  * behave the same at any loop speed.
  */
@@ -46,7 +45,6 @@ public class Flywheel extends SubsystemBase {
 
     private enum Mode { OFF, BOOST, RECOVER, PID }
 
-    private static final double BATTERY_PERIOD_S = 0.1;
 
     /** One motor + its own loop state and its own gains (the two sides aren't connected). */
     private static class Side {
@@ -133,9 +131,7 @@ public class Flywheel extends SubsystemBase {
     Telemetry telemetry;
     private final Side left, right;
     private State state = State.OFF;
-    private final VoltageSensor battery;
     private double batteryVolts = 12.0;
-    private final ElapsedTime batteryTimer = new ElapsedTime();
     private final ElapsedTime loopTimer = new ElapsedTime();
     private double dt = 1.0 / RoboConstants.LOOP_HZ;
 
@@ -161,9 +157,8 @@ public class Flywheel extends SubsystemBase {
         }
         left = new Side(a, true);
         right = new Side(b, false);
-        Iterator<VoltageSensor> it = hMap.voltageSensor.iterator();
-        battery = it.hasNext() ? it.next() : null;
-        readBattery();
+        Battery.init(hMap); // shared battery reading (utils/Battery)
+        batteryVolts = Battery.volts();
         RobotLog.i("[Flywheel] Initialized.");
     }
 
@@ -212,13 +207,6 @@ public class Flywheel extends SubsystemBase {
     public double getLeftPower() { return left.pwr; }
     public double getRightPower() { return right.pwr; }
 
-    private void readBattery() {
-        if (battery == null) return;
-        double v = battery.getVoltage();
-        if (v > 6.0) batteryVolts = 0.7 * batteryVolts + 0.3 * v; // smooth out spikes
-        batteryTimer.reset();
-    }
-
     private void updateFeedGate(double target) {
         double worstErr = target - Math.min(left.rpm, right.rpm);
         boolean wasOk = feedOk;
@@ -261,7 +249,7 @@ public class Flywheel extends SubsystemBase {
         loopTimer.reset();
         left.measure(dt);
         right.measure(dt);
-        if (batteryTimer.seconds() >= BATTERY_PERIOD_S) readBattery();
+        batteryVolts = Battery.volts(); // shared, re-read every 0.1 s
         double voltScale = RoboConstants.FLYWHEEL_NOMINAL_VOLTAGE / batteryVolts;
 
         if (state == State.OFF) {

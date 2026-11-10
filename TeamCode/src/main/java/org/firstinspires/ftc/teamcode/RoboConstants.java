@@ -20,7 +20,9 @@ public final class RoboConstants {
     public static final DcMotorSimple.Direction DRIVE_LEFT_BACK_DIRECTION   = DcMotorSimple.Direction.REVERSE;
     public static final DcMotorSimple.Direction DRIVE_RIGHT_FRONT_DIRECTION = DcMotorSimple.Direction.FORWARD;
     public static final DcMotorSimple.Direction DRIVE_RIGHT_BACK_DIRECTION  = DcMotorSimple.Direction.FORWARD;
-    public static double  DRIVE_NOMINAL_VOLTAGE      = 12.0;
+    // Drive voltage compensation (2026-11-09: now TeleOp too, every loop). Same stick = same speed at any battery.
+    // 12.5 = roughly a fresh battery under load, so the robot feels like it always did on a fresh battery.
+    public static double  DRIVE_NOMINAL_VOLTAGE      = 12.5;
     public static boolean DRIVE_VOLTAGE_COMP_ENABLED = true;
     // Load shedding (2026-11-05): while SHOOTING and a flywheel side is recovering, drive power is scaled down to
     // this at the worst dip (FLYWHEEL_FEED_MIN_RPM). The drivetrain is the biggest current draw on the robot.
@@ -178,6 +180,14 @@ public final class RoboConstants {
     // Push robot forward: X should go UP. Push left: Y should go UP. If not, flip it (JoJa Odometry Test D-pad L/R).
     public static boolean PINPOINT_X_REVERSED = false;
     public static boolean PINPOINT_Y_REVERSED = true;
+
+    // ====== Battery / voltage compensation (2026-11-09, utils/Battery) ======
+    // Intake + indexer + drive powers are scaled by NOMINAL / battery, so they run the same speed as the battery drains.
+    // (The flywheel always compensates, to its own FLYWHEEL_NOMINAL_VOLTAGE: its SysId gains depend on it.)
+    // Can't create volts the battery doesn't have: at power 1.0 there's nothing left to add.
+    public static boolean BATTERY_COMP_ENABLED   = true;
+    public static double  BATTERY_NOMINAL_VOLTAGE = 12.5; // the battery level the powers were tuned at
+    public static double  BATTERY_LOW_WARNING_V   = 11.8; // Driver Hub warning: swap the battery soon
 
     // ====== Utilities ======
     public static final double LOOP_HZ = 50.0;
