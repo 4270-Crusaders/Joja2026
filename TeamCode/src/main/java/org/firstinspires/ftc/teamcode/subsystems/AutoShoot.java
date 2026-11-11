@@ -116,6 +116,8 @@ public class AutoShoot {
 
             case DONE:
                 break; // wait for RT release
+            default:
+                throw new IllegalStateException("Unexpected value: " + phase);
         }
     }
 

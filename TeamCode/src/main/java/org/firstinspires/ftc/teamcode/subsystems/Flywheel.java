@@ -142,6 +142,7 @@ public class Flywheel extends SubsystemBase {
     private double feedScale = 0.0;       // see getFeedScale()
     private final ElapsedTime pauseTimer = new ElapsedTime();
     private double minShotL = 0.0, minShotR = 0.0;
+    private boolean leftEnabled = true, rightEnabled = true, telemetryEnabled = true;
 
     public Flywheel(final HardwareMap hMap, final String flywheelLeftName, final String flywheelRightName, Telemetry telemetry) {
         this.telemetry = telemetry;
@@ -207,6 +208,23 @@ public class Flywheel extends SubsystemBase {
     public double getLeftPower() { return left.pwr; }
     public double getRightPower() { return right.pwr; }
 
+    // ===== For JoJa Flywheel Graph Test (2026-11-10) =====
+    /** Run only some sides (a disabled side gets power 0). Default: both on. */
+    public void setSidesEnabled(boolean leftOn, boolean rightOn) { leftEnabled = leftOn; rightEnabled = rightOn; }
+    /** false = periodic() adds no telemetry lines (the graph test sends its own). */
+    public void setTelemetryEnabled(boolean on) { telemetryEnabled = on; }
+    private Side side(boolean isLeft) { return isLeft ? left : right; }
+    /** Each control term's power for one side (before battery scaling). */
+    public double getFfPower(boolean isLeft) { return side(isLeft).ffPwr; }  // kS + kV * target
+    public double getPPower(boolean isLeft)  { return side(isLeft).pPwr; }   // kP * error
+    public double getIPower(boolean isLeft)  { return side(isLeft).iPwr; }   // kI * integral
+    public double getDPower(boolean isLeft)  { return side(isLeft).dPwr; }   // -kD * accel
+    public double getAPower(boolean isLeft)  { return side(isLeft).aPwr; }   // kA * slowing-down accel
+    public double getAccel(boolean isLeft)   { return side(isLeft).accel; }  // RPM per second
+    /** OFF / BOOST (full power spin-up) / RECOVER (full power after a shot) / PID. */
+    public String getMode(boolean isLeft)    { return side(isLeft).mode.name(); }
+    public double getBatteryVolts() { return batteryVolts; }
+
     private void updateFeedGate(double target) {
         double worstErr = target - Math.min(left.rpm, right.rpm);
         boolean wasOk = feedOk;
@@ -256,10 +274,11 @@ public class Flywheel extends SubsystemBase {
             left.off();
             right.off();
         } else {
-            left.run(target, shooting, dt, voltScale);
-            right.run(target, shooting, dt, voltScale);
-            boolean bothAtSpeed = Math.abs(target - left.rpm) <= RoboConstants.FLYWHEEL_RPM_TOLERANCE
-                    && Math.abs(target - right.rpm) <= RoboConstants.FLYWHEEL_RPM_TOLERANCE;
+            if (leftEnabled) left.run(target, shooting, dt, voltScale); else left.off();
+            if (rightEnabled) right.run(target, shooting, dt, voltScale); else right.off();
+            // a disabled side (graph test only) doesn't count
+            boolean bothAtSpeed = (!leftEnabled || Math.abs(target - left.rpm) <= RoboConstants.FLYWHEEL_RPM_TOLERANCE)
+                    && (!rightEnabled || Math.abs(target - right.rpm) <= RoboConstants.FLYWHEEL_RPM_TOLERANCE);
             state = bothAtSpeed ? State.AT_SPEED : State.SPINNING_UP;
             // Lowest speed during each volley
             if (shooting && !wasShooting) { minShotL = left.rpm; minShotR = right.rpm; }
@@ -271,7 +290,7 @@ public class Flywheel extends SubsystemBase {
         left.out.set(left.pwr);
         right.out.set(right.pwr);
 
-        if (!LoopTimer.telemetryNow()) return; // telemetry only every TELEMETRY_PERIOD_MS (it's slow)
+        if (!telemetryEnabled || !LoopTimer.telemetryNow()) return; // telemetry only every TELEMETRY_PERIOD_MS (it's slow)
         // One number per line, so Panels can graph each one
         telemetry.addLine("====== Flywheel ======");
         telemetry.addData("Flywheel/State", state);

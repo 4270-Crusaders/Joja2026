@@ -23,7 +23,6 @@ import java.util.List;
  * Place the robot at START_X / START_Y / START_HEADING_DEG (edit here or live in Panels), then Play.
  * The robot does one move, then holds still. Measure where it REALLY ended with a tape measure and
  * compare to "Pose now". Also logged to logcat every 0.1 s, tag "[LocTest]".
- * Until the Foresight Procedure is tuned, Pedro uses placeholder path gains (pedro/Constants).
  */
 @Configurable
 public abstract class JoJaLocTest extends OpMode {

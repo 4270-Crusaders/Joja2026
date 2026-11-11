@@ -138,19 +138,19 @@ public final class RoboConstants {
     // If it still oscillates: lower kP. If it settles below target too slowly: raise kI a little.
     // 2026-11-02: kP 0.00015 / kI 0.0003 were too weak to hold the speed (it sagged ~500 RPM). Doubled both.
     // Shaking fast around target (+/-100 every few tenths of a second)? Lower kP. Slow drift below target? Raise kI.
-    public static double FLYWHEEL_LEFT_kP  = 0.0001249;  // SysId 2026-11-05
-    public static double FLYWHEEL_LEFT_kI  = 0.0011502;  // SysId 2026-11-05
+    public static double FLYWHEEL_LEFT_kP  = 0.0001125;  // SysId 2026-11-05
+    public static double FLYWHEEL_LEFT_kI  = 0.0010682;  // SysId 2026-11-05
     public static double FLYWHEEL_LEFT_kD  = 0.0;  // SysId 2026-11-05
-    public static double FLYWHEEL_LEFT_kV  = 0.0001955;  // SysId 2026-11-05
-    public static double FLYWHEEL_LEFT_kS  = 0.2484;  // SysId 2026-11-05
-    public static double FLYWHEEL_LEFT_kA  = 0.0000212;  // SysId 2026-11-05
+    public static double FLYWHEEL_LEFT_kV  = 0.0001909;  // SysId 2026-11-05
+    public static double FLYWHEEL_LEFT_kS  = 0.1911;  // SysId 2026-11-05
+    public static double FLYWHEEL_LEFT_kA  = 0.0000201;  // SysId 2026-11-05
 
-    public static double FLYWHEEL_RIGHT_kP = 0.0000953;  // SysId 2026-11-05
-    public static double FLYWHEEL_RIGHT_kI = 0.0010218;  // SysId 2026-11-05
+    public static double FLYWHEEL_RIGHT_kP = 0.0000989;  // SysId 2026-11-05
+    public static double FLYWHEEL_RIGHT_kI = 0.0009787;  // SysId 2026-11-05
     public static double FLYWHEEL_RIGHT_kD = 0.0;  // SysId 2026-11-05
-    public static double FLYWHEEL_RIGHT_kV = 0.0001827;  // SysId 2026-11-05
-    public static double FLYWHEEL_RIGHT_kS = 0.2167;  // SysId 2026-11-05
-    public static double FLYWHEEL_RIGHT_kA = 0.0000170;  // SysId 2026-11-05
+    public static double FLYWHEEL_RIGHT_kV = 0.0001782;  // SysId 2026-11-05
+    public static double FLYWHEEL_RIGHT_kS = 0.1427;  // SysId 2026-11-05
+    public static double FLYWHEEL_RIGHT_kA = 0.0000180;  // SysId 2026-11-05
 
     // Smoothing for the measured acceleration, in SECONDS (2026-11-05: was a per-loop 0.3, which changed with the
     // loop speed). Encoder velocity is noisy; this filters out the noise. Bigger = smoother but reacts later.
@@ -170,17 +170,16 @@ public final class RoboConstants {
     // ===== Odometry (goBILDA Pinpoint + 2 pods) =====
     // Control Hub I2C bus 1. Driver Hub config: "goBILDA Pinpoint Odometry Computer" named "pinpoint"
     public static final String PINPOINT_NAME = "pinpoint";
-    public static boolean PINPOINT_4_BAR_POD = true;  // true = 4-Bar Odometry Pod, false = Swingarm Pod. VERIFY
+    public static boolean PINPOINT_4_BAR_POD = true;  // true = 4-Bar Odometry Pod, false = Swingarm Pod (Pedro AutoTune 2026-11-10)
     // ONE place for the Pinpoint settings: Pedro (pedro/Constants), JoJa Tele and JoJa Odometry Test all read these.
     // Tune with Pedro AutoTune > Pinpoint Procedure (see pedro/Tuning.java), then copy its Java tab values HERE:
     //   xPodOffset -> PINPOINT_X_OFFSET_IN, yPodOffset -> PINPOINT_Y_OFFSET_IN,
     //   xPodDirection / yPodDirection REVERSED -> PINPOINT_X_REVERSED / PINPOINT_Y_REVERSED = true, podType -> PINPOINT_4_BAR_POD
-    // Offsets from the robot center, inches (last measured 2026-11-05):
+    // Offsets from the robot center, inches (Pedro AutoTune > Pinpoint Procedure, 2026-11-10):
     // X offset = how far LEFT (+) / right (-) the FORWARD pod (X port) is. Y offset = how far FORWARD (+) / back (-) the STRAFE pod (Y port) is.
-    public static double PINPOINT_X_OFFSET_IN = 1.44;
-    // 2026-11-05: was +4.29, measured while the Y pod was still backwards (Y_REVERSED false). Flipping the pod
-    // direction flips this sign too: the strafe pod is ~4.3 in BEHIND the center.
-    public static double PINPOINT_Y_OFFSET_IN = -4.17;
+    // Average of 2 counterclockwise runs: X 1.811 / 1.522, Y -5.371 / -3.218 (Y runs 2.2 in apart: redo if Loc Test 3 drifts)
+    public static double PINPOINT_X_OFFSET_IN = 1.666;
+    public static double PINPOINT_Y_OFFSET_IN = -4.294; // the strafe pod is ~4.3 in BEHIND the center
     // Push robot forward: X should go UP. Push left: Y should go UP. If not, flip it (JoJa Odometry Test D-pad L/R).
     public static boolean PINPOINT_X_REVERSED = false;
     public static boolean PINPOINT_Y_REVERSED = true;
