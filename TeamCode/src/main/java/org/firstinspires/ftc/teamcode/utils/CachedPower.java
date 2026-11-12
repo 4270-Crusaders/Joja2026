@@ -24,4 +24,7 @@ public final class CachedPower {
     }
 
     public double get() { return Double.isNaN(last) ? 0.0 : last; }
+
+    /** Forget the last value, so the next set() always writes (use after something else drove this motor). */
+    public void reset() { last = Double.NaN; }
 }

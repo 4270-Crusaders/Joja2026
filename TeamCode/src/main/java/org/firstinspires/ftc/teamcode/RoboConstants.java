@@ -49,7 +49,7 @@ public final class RoboConstants {
     // 2026-11-04: both raised to full speed (were intake 0.6, feed 0.8). 1.0 is the motor's max.
     public static double INDEXER_INTAKE_POWER  = 0.5;   // 2026-11-04: halved (was 1.0) at team request
 
-    public static double INDEXER_FEED_POWER = 1.0;
+    public static double INDEXER_FEED_POWER = 0.9;   // 2026-11-11: 90% (was 1.0) at team request
     // 2026-11-04 (3.7:1 motor): the feed gate used to STOP the indexer between balls, so it restarted from a dead
     // stop every ball. Each restart pulls a big current spike (brownout) and wastes time (slow balls per second).
     // Now, while the flywheel recovers, the indexer just slows to this power instead of stopping.
@@ -79,7 +79,7 @@ public final class RoboConstants {
     public static final DcMotorSimple.Direction FLYWHEEL_RIGHT_DIRECTION = DcMotorSimple.Direction.FORWARD;
     public static final int FLYWHEEL_TPR = 28;            // bare motor encoder, ticks per motor rev
     public static double FLYWHEEL_GEAR_RATIO    = 1.0;    // motor revs per wheel rev. JoJa: 1:1
-    public static double FLYWHEEL_TARGET_RPM    = 3250; // wheel RPM (set by team 2026-10-24)
+    public static double FLYWHEEL_TARGET_RPM    = 3255; // wheel RPM (set by team 2026-10-24)
     // Panels graph zoom (JoJa Tele graph()): the y-axis shows TARGET +/- this many RPM. Anything outside is drawn
     // flat on the edge. Bigger = see more, smaller = see small wiggles. Live-tunable in Panels.
     public static double GRAPH_RPM_WINDOW = 75.0; // 2026-11-04: was 150, zoomed in more
@@ -181,8 +181,40 @@ public final class RoboConstants {
     public static double PINPOINT_X_OFFSET_IN = 1.666;
     public static double PINPOINT_Y_OFFSET_IN = -4.294; // the strafe pod is ~4.3 in BEHIND the center
     // Push robot forward: X should go UP. Push left: Y should go UP. If not, flip it (JoJa Odometry Test D-pad L/R).
+    // Pedro AutoTune 2026-11-10: xPodDirection FORWARD, yPodDirection REVERSED. 2026-11-11: X was flipped to true
+    // by hand and every Loc Test / R1 broke (forward read as backward). Only change these after AutoTune says so.
     public static boolean PINPOINT_X_REVERSED = false;
     public static boolean PINPOINT_Y_REVERSED = true;
+
+    // ===== JoJa Tele A button: "the robot is HERE" (2026-11-11) =====
+    // A sets x = A_X, y = A_Y AND heading = A_HEADING_DEG (also the pose at Init).
+    // Heading = the way the robot's FRONT faces on the Pedro field:
+    //   0 = right (+X)   90 = up the field (+Y)   180 = left (-X)   -90 = down (-Y)
+    // Wrong heading = the whole map is turned: driving into the field gives NEGATIVE x / y. Never fix that by
+    // reversing a pod (that breaks Pedro): fix this heading.
+    public static double A_X = 0.0;
+    public static double A_Y = 0.0;
+    public static double A_HEADING_DEG = 0.0;
+
+    // ===== JoJa Tele R1: drive to the shooting spot with Pedro (2026-11-11) =====
+    // Pedro field: inches, (0,0) = bottom-left corner, heading 0 = facing +X, counterclockwise +.
+    // Which spot R1 goes to depends on where the robot is when you press it (2026-11-11):
+    //   robot on spot 1's side of TRACK_SPOT1_EDGE_X -> spot 1
+    //   robot on spot 2's side of TRACK_SPOT2_EDGE_X -> spot 2      in between -> nothing
+    // "Side" comes from where each spot's own x is, so negative or positive numbers both work.
+    // Now: spot 1 x = -7 is above -50, so x > -50 (0 to -50) = spot 1. Spot 2 x = -115 is below -80, so x < -80 = spot 2.
+    public static double TRACK_SPOT1_EDGE_X = -50.0;
+    public static double TRACK_SPOT2_EDGE_X = -80.0;
+    // Spot 1
+    public static double TRACK_TARGET_X = -8.00;
+    public static double TRACK_TARGET_Y = 53.15;
+    public static double TRACK_TARGET_HEADING_DEG = 0;
+    // Spot 2
+    public static double TRACK_TARGET2_X = -116.00;
+    public static double TRACK_TARGET2_Y = 54.15;
+    public static double TRACK_TARGET2_HEADING_DEG = 180;
+    // Moving a stick more than this while it drives = you take over (cancel).
+    public static double TRACK_CANCEL_STICK = 0.2;
 
     // ====== Battery / voltage compensation (2026-11-09, utils/Battery) ======
     // Intake + indexer + drive powers are scaled by NOMINAL / battery, so they run the same speed as the battery drains.

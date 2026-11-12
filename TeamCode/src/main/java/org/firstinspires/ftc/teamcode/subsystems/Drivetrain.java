@@ -107,6 +107,9 @@ public class Drivetrain extends SubsystemBase {
         state = State.IDLE;
     }
 
+    /** Next periodic() writes all 4 motors even if unchanged. Call after Pedro drove them (JoJa Tele R1). */
+    public void forceWrite() { lfOut.reset(); lbOut.reset(); rfOut.reset(); rbOut.reset(); }
+
     /** True while a timed move is still running (for the auto sequencer). */
     public boolean isBusy() {
         return state == State.TIMED_MOVE;
