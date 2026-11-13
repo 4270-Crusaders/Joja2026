@@ -206,12 +206,12 @@ public final class RoboConstants {
     public static double TRACK_SPOT1_EDGE_X = -50.0;
     public static double TRACK_SPOT2_EDGE_X = -80.0;
     // Spot 1
-    public static double TRACK_TARGET_X = -8.00;
-    public static double TRACK_TARGET_Y = 53.15;
+    public static double TRACK_TARGET_X = -8.05;
+    public static double TRACK_TARGET_Y = 53.85;
     public static double TRACK_TARGET_HEADING_DEG = 0;
     // Spot 2
-    public static double TRACK_TARGET2_X = -116.00;
-    public static double TRACK_TARGET2_Y = 54.15;
+    public static double TRACK_TARGET2_X = -115.85;
+    public static double TRACK_TARGET2_Y = 58.45;
     public static double TRACK_TARGET2_HEADING_DEG = 180;
     // Moving a stick more than this while it drives = you take over (cancel).
     public static double TRACK_CANCEL_STICK = 0.2;
