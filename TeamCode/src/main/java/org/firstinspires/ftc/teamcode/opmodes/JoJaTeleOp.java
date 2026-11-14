@@ -4,7 +4,6 @@ import com.bylazar.telemetry.PanelsTelemetry;
 import com.bylazar.telemetry.TelemetryManager;
 import com.arcrobotics.ftclib.gamepad.GamepadEx;
 import com.arcrobotics.ftclib.gamepad.GamepadKeys;
-import com.pedropathing.api.Paths;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.math.Pose;
 import com.pedropathing.revhub.drivetrains.Mecanum;
@@ -42,10 +41,11 @@ public class JoJaTeleOp extends OpMode {
     private Flywheel flywheel;
     private MatchLoader matchLoader;
     private AutoShoot autoShoot;   // opens / closes the stopper by itself (RoboConstants.AUTO_SHOOT_...)
-    // Pedro (Pinpoint) position on the Pedro field (A = (0,0)). It only drives the motors while R1 tracking is on.
+    // Pedro (Pinpoint) position on the Pedro field. In TeleOp it only reads the position (never drives the motors).
     private Follower follower;
-    private boolean tracking = false; // R1: Pedro is driving to TRACK_TARGET
-    private int trackSpot = -1;       // last R1 press: 1 / 2 = which spot, 0 = robot was between the zones, -1 = not yet
+    private boolean aiming = false;   // R1: turn so the shooter points at the nearest hive
+    private String aimHiveName = "-";
+    private double aimErrDeg = 0.0, aimDist = 0.0;
 
     // ===== Utils =====
     private GamepadEx driverOp;
@@ -83,8 +83,8 @@ public class JoJaTeleOp extends OpMode {
         // it remembers the last setting and skips re-sending it. Setting it behind Pedro's back (2026-11-11 first fix)
         // made it skip switching to FLOAT for paths, so R1 drove with brakes on and stopped in the wrong spot.
         ((Mecanum) follower.drivetrain).setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        follower.setPose(aPose()); // start at the A pose (same as pressing A), so the heading is right from Init
-        // No auto to carry the position over from (autos removed 2026-11-09): press A at the bottom-left corner for (0,0).
+        // Start where the auto ended (real field position, needed for hive aiming); no auto run = the A pose
+        follower.setPose(startPose());
 
         // util
         driverOp = new GamepadEx(gamepad1);
@@ -105,7 +105,17 @@ public class JoJaTeleOp extends OpMode {
     @Override
     public void start() {
         loopTimer = new LoopTimer();
-        follower.setPose(aPose()); // again at Play: the Pinpoint may still have been calibrating at Init
+        follower.setPose(startPose()); // again at Play: the Pinpoint may still have been calibrating at Init
+        // used once: the next TeleOp (without a new auto first) must not start from this old auto position
+        startedFromAuto = JoJaPedroAuto.lastPose != null;
+        JoJaPedroAuto.lastPose = null;
+    }
+
+    private boolean startedFromAuto = false;
+
+    /** Where the auto ended, or the A pose if no auto ran since the last TeleOp. */
+    private static Pose startPose() {
+        return JoJaPedroAuto.lastPose != null ? JoJaPedroAuto.lastPose : aPose();
     }
 
     // During INIT too, so the Graph variables show up in Panels before you press Play
@@ -127,22 +137,14 @@ public class JoJaTeleOp extends OpMode {
          * Drive Stuff
          */
         double fwd = driverOp.getLeftY(), strafe = driverOp.getLeftX(), turn = driverOp.getRightX();
-        drivetrain.drive(fwd, strafe, turn);
+        follower.localizer.update(); // position only: in TeleOp Pedro never drives the motors
 
-        // ===== R1: Pedro drives to TRACK_TARGET and holds it there. Stick moved or R1 again = you take over =====
-        boolean sticksMoved = Math.abs(fwd) > RoboConstants.TRACK_CANCEL_STICK
-                || Math.abs(strafe) > RoboConstants.TRACK_CANCEL_STICK
-                || Math.abs(turn) > RoboConstants.TRACK_CANCEL_STICK;
-        if (driverOp.wasJustPressed(GamepadKeys.Button.RIGHT_BUMPER)) {
-            if (tracking) stopTracking(); else startTracking();
-        } else if (tracking && sticksMoved) {
-            stopTracking();
-        }
-        if (tracking) {
-            follower.update();           // Pedro reads the Pinpoint AND drives the 4 drive motors
-        } else {
-            follower.localizer.update(); // position only: Pedro must not touch the drive motors
-        }
+        // ===== R1: aim at the nearest hive (2026-11-13). You keep driving with the left stick; the robot turns
+        // itself so the shooter points at the hive. R1 again, or moving the right stick, = you take over turning =====
+        if (driverOp.wasJustPressed(GamepadKeys.Button.RIGHT_BUMPER)) aiming = !aiming;
+        if (aiming && Math.abs(turn) > RoboConstants.AIM_CANCEL_STICK) aiming = false;
+        if (aiming) turn = aimTurn();
+        drivetrain.drive(fwd, strafe, turn);
 
         // ===== Match loader toggle =====
         if (driverOp.wasJustPressed(GamepadKeys.Button.LEFT_BUMPER)) { // L1: match loader up/down
@@ -223,7 +225,7 @@ public class JoJaTeleOp extends OpMode {
         }
 
         // subsystem
-        if (!tracking) drivetrain.periodic(); // while tracking, Pedro drives the motors (follower.update above)
+        drivetrain.periodic();
         flywheel.periodic();
         intake.periodic();
         indexer.periodic();
@@ -238,11 +240,10 @@ public class JoJaTeleOp extends OpMode {
         tele.addData("Stopper (Y)", stopper.isOpen() ? "OPEN" : "CLOSED");
         autoShoot.addTelemetry();
         Pose pose = follower.pose();
-        tele.addData("Drive to spot (R1)", tracking
-                ? (follower.holding() ? "HOLDING at spot " + trackSpot + " (move a stick to take over)" : "DRIVING to spot " + trackSpot)
-                : trackSpot == 0 ? String.format("OFF: x is between %.0f and %.0f, drive out of the middle",
-                        RoboConstants.TRACK_SPOT1_EDGE_X, RoboConstants.TRACK_SPOT2_EDGE_X)
-                : "OFF");
+        tele.addData("Aim at hive (R1)", !aiming ? "OFF"
+                : String.format("%s hive  %s  (error %.1f deg, %.0f in away)", aimHiveName,
+                        Math.abs(aimErrDeg) <= RoboConstants.AIM_TOLERANCE_DEG ? "AIMED" : "turning", aimErrDeg, aimDist));
+        tele.addData("Position from", startedFromAuto ? "end of auto (A = reset)" : "A pose (no auto ran)");
         tele.addData("Odometry/X in", "%.2f", pose.x());
         tele.addData("Odometry/Y in", "%.2f", pose.y());
         tele.addData("Odometry/Heading deg", "%.1f", Math.toDegrees(pose.heading()));
@@ -256,57 +257,37 @@ public class JoJaTeleOp extends OpMode {
         panels.update(telemetry);
     }
 
-    /** true if robot x is on the same side of edgeX as the spot's own x (spot x above the edge = robot x above it). */
-    private static boolean onSpotSide(double robotX, double edgeX, double spotX) {
-        return spotX >= edgeX ? robotX > edgeX : robotX < edgeX;
-    }
-
     /** The A button pose: RoboConstants A_X, A_Y, A_HEADING_DEG. */
     private static Pose aPose() {
         return new Pose(RoboConstants.A_X, RoboConstants.A_Y, Math.toRadians(RoboConstants.A_HEADING_DEG));
     }
 
     /**
-     * R1: pick the spot from where the robot is (on spot 1's side of TRACK_SPOT1_EDGE_X = spot 1, on spot 2's side
-     * of TRACK_SPOT2_EDGE_X = spot 2, in between = nothing), drive a straight line there (turning to its heading on
-     * the way), then hold it. Works with negative or positive x.
+     * R1 aim: turn power that points the SHOOTER at the nearest hive (Pedro field coordinates, RoboConstants HIVE_...).
+     * The shooter is on the back (AIM_SHOOTER_ON_BACK), so the robot's front points AWAY from the hive.
+     * Proportional turn: AIM_KP * error, at most AIM_MAX_TURN, at least AIM_MIN_TURN (so it doesn't stall just short),
+     * 0 once within AIM_TOLERANCE_DEG.
      */
-    private void startTracking() {
-        Pose now = follower.pose();
-        double tx, ty, thDeg;
-        if (onSpotSide(now.x(), RoboConstants.TRACK_SPOT1_EDGE_X, RoboConstants.TRACK_TARGET_X)) {
-            tx = RoboConstants.TRACK_TARGET_X; ty = RoboConstants.TRACK_TARGET_Y; thDeg = RoboConstants.TRACK_TARGET_HEADING_DEG;
-            trackSpot = 1;
-        } else if (onSpotSide(now.x(), RoboConstants.TRACK_SPOT2_EDGE_X, RoboConstants.TRACK_TARGET2_X)) {
-            tx = RoboConstants.TRACK_TARGET2_X; ty = RoboConstants.TRACK_TARGET2_Y; thDeg = RoboConstants.TRACK_TARGET2_HEADING_DEG;
-            trackSpot = 2;
-        } else {
-            trackSpot = 0; // between the two zones: R1 does nothing
-            return;
-        }
-        // Motors to 0 first: Pedro also skips "unchanged" powers, and it thinks they're at 0 (its last write)
-        drivetrain.drive(0.0, 0.0, 0.0);
-        drivetrain.periodic();
-        // Turn the SHORT way: target heading = now + the -180..180 difference (200 deg and -160 deg are the same
-        // direction, but going from -170 to +200 would be a 370 deg spin)
-        double diff = Math.toRadians(thDeg) - now.heading();
-        diff = Math.atan2(Math.sin(diff), Math.cos(diff));
-        Pose target = new Pose(tx, ty, now.heading() + diff);
-        if (now.distance(target) < 1.0) {
-            follower.hold(target); // already there (a 0-length path can't be followed): just hold
-        } else {
-            follower.follow(Paths.line(now, target).linear(now.heading(), target.heading()));
-        }
-        tracking = true;
-    }
+    private double aimTurn() {
+        Pose p = follower.pose();
+        double dBottom = Math.hypot(RoboConstants.HIVE_BOTTOM_X - p.x(), RoboConstants.HIVE_BOTTOM_Y - p.y());
+        double dTop = Math.hypot(RoboConstants.HIVE_TOP_X - p.x(), RoboConstants.HIVE_TOP_Y - p.y());
+        boolean bottom = dBottom <= dTop;
+        double hx = bottom ? RoboConstants.HIVE_BOTTOM_X : RoboConstants.HIVE_TOP_X;
+        double hy = bottom ? RoboConstants.HIVE_BOTTOM_Y : RoboConstants.HIVE_TOP_Y;
+        aimHiveName = bottom ? "BOTTOM" : "TOP";
+        aimDist = Math.min(dBottom, dTop);
 
-    /** Give the drive motors back to the driver. */
-    private void stopTracking() {
-        follower.stop();
-        follower.update();     // IDLE: Pedro sets the 4 drive motors to 0 once
-        drivetrain.forceWrite(); // our next write always goes out (its cache doesn't know Pedro changed them)
-        // (Pedro's stop above already switched the motors back to BRAKE: Constants manualBrakeMode = true)
-        tracking = false;
+        double toHive = Math.atan2(hy - p.y(), hx - p.x());                     // direction robot -> hive
+        double want = toHive + (RoboConstants.AIM_SHOOTER_ON_BACK ? Math.PI : 0.0); // front heading we need
+        double err = want - p.heading();
+        err = Math.atan2(Math.sin(err), Math.cos(err)); // -180..180: always the short way (+ = turn left / CCW)
+        aimErrDeg = Math.toDegrees(err);
+
+        if (Math.abs(aimErrDeg) <= RoboConstants.AIM_TOLERANCE_DEG) return 0.0;
+        double ccw = RoboConstants.AIM_KP * err;
+        ccw = Math.signum(ccw) * Math.max(RoboConstants.AIM_MIN_TURN, Math.min(RoboConstants.AIM_MAX_TURN, Math.abs(ccw)));
+        return -ccw; // Drivetrain turn + = clockwise
     }
 
     /**
@@ -333,7 +314,6 @@ public class JoJaTeleOp extends OpMode {
 
     public void stop() {
         LoopTimer.release();
-        if (tracking) stopTracking();
         drivetrain.stop();
         flywheel.stop();
         intake.setState(Intake.State.OFF);

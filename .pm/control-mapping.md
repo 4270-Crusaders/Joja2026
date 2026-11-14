@@ -13,7 +13,7 @@ Shooting is **manual**: the driver spins up and opens the stopper whenever they 
 | Right stick X | Turn | Drivetrain | `MANUAL` |
 | Right trigger (hold, > 0.3) | Spin flywheel + indexer | Flywheel, Indexer | Per-side PIDF (boost) to `FLYWHEEL_TARGET_RPM`. Indexer `FEEDING` if stopper open, `INTAKING` if closed. Intake NOT run. Keeps going 0.5 s after release |
 | Y (press) | Toggle stopper | Stopper | `CLOSED` ↔ `OPEN`. Starts `CLOSED`. 2026-11-11: was R1 |
-| Right bumper / R1 (press) | Drive to shooting spot | Pedro follower | Robot on spot 1's side of `TRACK_SPOT1_EDGE_X`: spot 1 `TRACK_TARGET_...`; on spot 2's side of `TRACK_SPOT2_EDGE_X`: spot 2 `TRACK_TARGET2_...`; in between: nothing (works with negative x). Drives there and holds. Stick > `TRACK_CANCEL_STICK` or R1 again = driver takes over. 2026-11-11 |
+| Right bumper / R1 (press) | Aim at nearest hive (on/off) | Drivetrain (turn) | Robot turns so the back shooter points at the nearest hive (`HIVE_BOTTOM` (55.75, 55.75) / `HIVE_TOP` (55.75, 88.75)); left stick still drives. Right stick > `AIM_CANCEL_STICK` or R1 again = off. 2026-11-13 (replaced drive-to-spot) |
 | Left trigger (hold, > 0.3) | Intake / feed | Intake, Indexer, Stopper | Flywheel off: press → stopper `CLOSED`, Intake + Indexer `INTAKING`. Flywheel on + stopper open: Indexer `FEEDING` (shoots), stopper not touched |
 | X (hold) | Outtake (reverse) | Intake, Indexer | Intake `REVERSING`, Indexer `REVERSING` (stopper unchanged). 2026-11-11: was B |
 | A (press) | Set position to (0,0) | Odometry | Pinpoint X/Y = 0, heading kept (Pedro field: (0,0) bottom-left). 2026-11-09: was X, then moved to A |

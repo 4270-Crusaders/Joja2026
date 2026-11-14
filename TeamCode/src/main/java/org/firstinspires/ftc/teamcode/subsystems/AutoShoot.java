@@ -43,6 +43,8 @@ public class AutoShoot {
     }
 
     public Phase getPhase() { return phase; }
+    public int getBalls() { return balls; }
+    public String getLastReason() { return lastReason; }
 
     /** The driver used R1: stop doing anything automatic until RT is released. */
     public void cancel() {
@@ -56,8 +58,11 @@ public class AutoShoot {
      * Call every loop, BEFORE the stopper decides indexer/intake states.
      * @param flywheelOn the flywheel is spinning (RT held, or its short run-on)
      */
-    public void update(boolean flywheelOn) {
-        if (!RoboConstants.AUTO_SHOOT_ENABLED) {
+    public void update(boolean flywheelOn) { update(flywheelOn, false); }
+
+    /** @param always true = run even when AUTO_SHOOT_ENABLED is off (autonomous always shoots this way). */
+    public void update(boolean flywheelOn, boolean always) {
+        if (!always && !RoboConstants.AUTO_SHOOT_ENABLED) {
             phase = Phase.IDLE;
             return;
         }

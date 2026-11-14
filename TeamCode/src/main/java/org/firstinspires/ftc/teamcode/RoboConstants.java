@@ -108,6 +108,12 @@ public final class RoboConstants {
     public static double AUTO_SHOOT_EMPTY_S   = 0.6;   // closes too early mid-volley? raise it. Stays open too long? lower it.
     public static double AUTO_SHOOT_NO_BALL_S = 1.0;
     public static double AUTO_SHOOT_MAX_S     = 4.0;
+    // Autonomous (JoJaPedroAuto, 2026-11-13). "Shoot" uses the auto shoot above (also when AUTO_SHOOT_ENABLED is off).
+    public static double AUTO_SHOOT_STEP_MAX_S = 5.0; // never stay at a shoot spot longer than this (e.g. never reaches RPM)
+    public static double AUTO_COLLECT_DWELL_S  = 0.75; // "Garden": keep intaking this long after arriving
+    public static double AUTO_FLOWER_EARLY_S   = 0.3;  // "Flower": match loader down + intake this long BEFORE arriving
+    public static double AUTO_FLOWER_WAIT_S    = 3.0;  // "Flower" / "Matchloader-down": stay there this long, intaking (2026-11-13: 4 -> 3)
+    public static double AUTO_LOADER_MOVE_S    = 0.3;  // "Matchloader-down": wait for the servo to get down before driving
     // MASTER SWITCH (2026-11-05): false = NO feed gate. Indexer + intake feed at full speed the whole time the stopper
     // is open, no waiting for spin-up, no slowing during dips (like before the gate existed). Fastest balls/sec.
     // true = everything below (spin-up wait + proportional feed). Live-tunable in Panels.
@@ -160,8 +166,8 @@ public final class RoboConstants {
     // ===== Match Loader =====
     // Expansion Hub servo port 0, goBILDA positional servo
     public static final String MATCH_LOADER_SERVO_NAME = "matchLoader";
-    public static double MATCH_LOADER_DOWN_POS = 0.42; // deployed down (JoJa Match Loader Test, 2026-11-09)
-    public static double MATCH_LOADER_UP_POS   = 0.742; // closed / up (JoJa Match Loader Test, 2026-11-09)
+    public static double MATCH_LOADER_DOWN_POS = 0.300; // deployed down (JoJa Match Loader Test, 2026-11-09)
+    public static double MATCH_LOADER_UP_POS   = 0.65; // closed / up (JoJa Match Loader Test, 2026-11-09)
     public static double MATCH_LOADER_MIDDLE_POS = 0.524; // pollen-only gap, no nectar (JoJa Match Loader Test, 2026-11-09)
     // Trim added to ALL three positions (fixes a servo horn screwed on at the wrong angle).
     // Adjust live in JoJa Tele with the D-pad, then copy the value shown on the Driver Hub here.
@@ -196,25 +202,21 @@ public final class RoboConstants {
     public static double A_Y = 0.0;
     public static double A_HEADING_DEG = 0.0;
 
-    // ===== JoJa Tele R1: drive to the shooting spot with Pedro (2026-11-11) =====
+    // ===== JoJa Tele R1: aim the shooter at the nearest hive (2026-11-13) =====
+    // (Replaces "drive to spot". Last spots, in the old turned map: spot 1 (-8.05, 53.85, 0), spot 2 (-115.85, 58.45, 180).)
     // Pedro field: inches, (0,0) = bottom-left corner, heading 0 = facing +X, counterclockwise +.
-    // Which spot R1 goes to depends on where the robot is when you press it (2026-11-11):
-    //   robot on spot 1's side of TRACK_SPOT1_EDGE_X -> spot 1
-    //   robot on spot 2's side of TRACK_SPOT2_EDGE_X -> spot 2      in between -> nothing
-    // "Side" comes from where each spot's own x is, so negative or positive numbers both work.
-    // Now: spot 1 x = -7 is above -50, so x > -50 (0 to -50) = spot 1. Spot 2 x = -115 is below -80, so x < -80 = spot 2.
-    public static double TRACK_SPOT1_EDGE_X = -50.0;
-    public static double TRACK_SPOT2_EDGE_X = -80.0;
-    // Spot 1
-    public static double TRACK_TARGET_X = -8.05;
-    public static double TRACK_TARGET_Y = 53.85;
-    public static double TRACK_TARGET_HEADING_DEG = 0;
-    // Spot 2
-    public static double TRACK_TARGET2_X = -115.85;
-    public static double TRACK_TARGET2_Y = 58.45;
-    public static double TRACK_TARGET2_HEADING_DEG = 180;
-    // Moving a stick more than this while it drives = you take over (cancel).
-    public static double TRACK_CANCEL_STICK = 0.2;
+    // Needs the REAL field position: JoJa Tele starts from where the auto ended, or set A_X / A_Y / A_HEADING_DEG
+    // to a real field spot and press A there.
+    public static double HIVE_BOTTOM_X = 55.75;
+    public static double HIVE_BOTTOM_Y = 55.75;
+    public static double HIVE_TOP_X = 55.75;
+    public static double HIVE_TOP_Y = 88.75;
+    public static boolean AIM_SHOOTER_ON_BACK = true; // the shooter is on the back: the front points AWAY from the hive
+    public static double AIM_KP = 1.2;             // turn power per radian of error. Overshoots / wobbles? lower it
+    public static double AIM_MAX_TURN = 0.6;       // fastest turn power while aiming
+    public static double AIM_MIN_TURN = 0.08;      // smallest turn power (stops just short of the hive? raise it)
+    public static double AIM_TOLERANCE_DEG = 1.5;  // this close = AIMED, stop turning
+    public static double AIM_CANCEL_STICK = 0.2;   // right stick moved more than this = you take over turning
 
     // ====== Battery / voltage compensation (2026-11-09, utils/Battery) ======
     // Intake + indexer + drive powers are scaled by NOMINAL / battery, so they run the same speed as the battery drains.
